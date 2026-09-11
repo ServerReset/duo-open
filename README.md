@@ -39,11 +39,18 @@ wallpaper mode if you'd rather not enable an accessibility service.
    - This fork uses the app id `com.duoopen.live` and its own signing key, so
      it installs **alongside** the original Duo Open instead of failing with
      "App not installed". Uninstalling the original is optional.
-2. Open **Duo Open Live** → **Tune** → **Turn on in Accessibility** → enable
-   *Duo Open Live full-screen fold*.
-   - Android 13+ blocks accessibility for sideloaded apps until you allow
-     it: if the toggle is greyed out, go to *Settings → Apps → Duo Open Live →
-     ⋮ (top right) → Allow restricted settings*, then try again.
+2. Open **Duo Open Live** → **Tune** → tap **Setup guide** (or **Turn on in
+   Accessibility**) and follow it.
+   - Android 13+ blocks Accessibility for sideloaded apps ("restricted
+     settings"). The **Allow restricted settings** option stays **hidden until
+     you first try to toggle the service on and Android refuses you** — then go
+     to *Settings → Apps → Duo Open Live → ⋮ → Allow restricted settings* and
+     try again.
+   - Samsung: on One UI 6+ it may be a plain item lower on the app info page;
+     on One UI 6.1.1+ turn off *Settings → Security and privacy → Auto Blocker*
+     first.
+   - Full per-brand walkthrough, plus an ADB shortcut:
+     [docs/ENABLE_ACCESSIBILITY.md](docs/ENABLE_ACCESSIBILITY.md).
 3. Fold the phone partway and open it. **Tune → Test it now** replays the
    effect without folding.
 
@@ -117,7 +124,9 @@ overlay/FoldOverlayService.kt             accessibility service: screenshot + ov
 overlay/FoldOverlayView.kt                draws the snapshot through the shader (half-res layer)
 wallpaper/DuoWallpaperService.kt          live wallpaper engine
 wallpaper/WallpaperImage.kt               picked image / generated default
-ui/                                       Compose app: preview, Tune sheet
+ui/                                       Compose app: preview, Tune sheet, setup guide
+ui/AccessibilityGuide.kt                  restricted-settings walkthrough (deep links)
+docs/ENABLE_ACCESSIBILITY.md              written per-brand enablement guide
 settings/DuoSettings.kt                   shared tuning (SharedPreferences + StateFlow)
 ```
 

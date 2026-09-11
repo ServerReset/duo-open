@@ -4,6 +4,7 @@ import android.app.WallpaperManager
 import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
+import android.net.Uri
 import android.provider.Settings
 import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -111,6 +112,7 @@ fun DuoApp(foldLineFlow: StateFlow<FoldLine?>) {
     val setWallpaper = { openWallpaperPicker(context) }
 
     var showSheet by remember { mutableStateOf(false) }
+    var showGuide by remember { mutableStateOf(false) }
 
     Box(Modifier.fillMaxSize().background(Color.Black)) {
         HomePreview(
@@ -119,8 +121,13 @@ fun DuoApp(foldLineFlow: StateFlow<FoldLine?>) {
             paneTilt = paneTilt,
             simulated = simulate,
             batterySaverReduced = effectReduced,
+            overlayEnabled = overlayEnabled,
             wallpaperActive = wallpaperActive,
             onSetWallpaper = setWallpaper,
+            onSetup = {
+                showSheet = false
+                showGuide = true
+            },
             onTune = { showSheet = true },
             modifier = if (shader != null && !overlayRunning && !effectReduced) {
                 Modifier.foldEffect(shader, { paneTilt }, config, pxPerMm, foldLine)
@@ -148,6 +155,10 @@ fun DuoApp(foldLineFlow: StateFlow<FoldLine?>) {
                 onSetWallpaper = setWallpaper,
                 overlayEnabled = overlayEnabled,
                 onEnableOverlay = { openAccessibilitySettings(context) },
+                onOpenGuide = {
+                    showSheet = false
+                    showGuide = true
+                },
                 onTestOverlay = {
                     val service = FoldOverlayService.instance
                     if (service == null) {
@@ -164,6 +175,16 @@ fun DuoApp(foldLineFlow: StateFlow<FoldLine?>) {
                 onDismiss = { showSheet = false },
             )
         }
+
+        if (showGuide) {
+            AccessibilityGuide(
+                overlayEnabled = overlayEnabled,
+                onOpenAccessibility = { openAccessibilitySettings(context) },
+                onOpenAppInfo = { openAppInfo(context) },
+                onCheckAgain = { resumeTick++ },
+                onDismiss = { showGuide = false },
+            )
+        }
     }
 }
 
@@ -178,6 +199,16 @@ private fun openAccessibilitySettings(context: Context) {
         .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
     if (runCatching { context.startActivity(intent) }.isFailure) {
         Toast.makeText(context, "Couldn't open Accessibility settings", Toast.LENGTH_SHORT).show()
+    }
+}
+
+/** The app info page is where the "Allow restricted settings" option lives. */
+private fun openAppInfo(context: Context) {
+    val intent = Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS)
+        .setData(Uri.fromParts("package", context.packageName, null))
+        .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+    if (runCatching { context.startActivity(intent) }.isFailure) {
+        Toast.makeText(context, "Couldn't open app info", Toast.LENGTH_SHORT).show()
     }
 }
 

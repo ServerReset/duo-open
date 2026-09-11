@@ -50,6 +50,7 @@ fun ControlSheet(
     onSetWallpaper: () -> Unit,
     overlayEnabled: Boolean,
     onEnableOverlay: () -> Unit,
+    onOpenGuide: () -> Unit,
     onTestOverlay: () -> Unit,
     onDismiss: () -> Unit,
 ) {
@@ -71,7 +72,9 @@ fun ControlSheet(
                 if (overlayEnabled) {
                     "On — folds the whole screen (any wallpaper, icons, apps) as you open the phone."
                 } else {
-                    "Off — only the live wallpaper folds. Turn on “Duo Open full-screen fold” under Accessibility to fold everything."
+                    "Off — only the live wallpaper folds. Android blocks Accessibility for sideloaded apps " +
+                        "(“restricted settings”), so turning it on takes two extra taps the first time. The " +
+                        "guide walks you through it."
                 },
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -83,6 +86,7 @@ fun ControlSheet(
                     OutlinedButton(onClick = onEnableOverlay, modifier = Modifier.weight(1f)) { Text("Accessibility") }
                 } else {
                     Button(onClick = onEnableOverlay, modifier = Modifier.weight(1f)) { Text("Turn on in Accessibility") }
+                    OutlinedButton(onClick = onOpenGuide, modifier = Modifier.weight(1f)) { Text("Setup guide") }
                 }
             }
 

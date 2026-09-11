@@ -58,8 +58,10 @@ fun HomePreview(
     paneTilt: Float,
     simulated: Boolean,
     batterySaverReduced: Boolean,
+    overlayEnabled: Boolean,
     wallpaperActive: Boolean,
     onSetWallpaper: () -> Unit,
+    onSetup: () -> Unit,
     onTune: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
@@ -94,6 +96,11 @@ fun HomePreview(
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {
             Clock()
+
+            if (!overlayEnabled) {
+                Spacer(Modifier.height(14.dp))
+                SetupBanner(onSetup)
+            }
 
             Spacer(Modifier.weight(1f))
 
@@ -157,6 +164,42 @@ private fun Clock() {
         fontWeight = FontWeight.Light,
         letterSpacing = (-2).sp,
     )
+}
+
+@Composable
+private fun SetupBanner(onSetup: () -> Unit) {
+    Row(
+        Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(20.dp))
+            .background(Glass)
+            .border(1.dp, GlassEdge, RoundedCornerShape(20.dp))
+            .padding(horizontal = 16.dp, vertical = 12.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Column(Modifier.weight(1f)) {
+            Text(
+                "Full-screen fold is off",
+                color = Color.White,
+                fontSize = 14.sp,
+                fontWeight = FontWeight.SemiBold,
+            )
+            Text(
+                "Set it up to fold apps and the launcher too",
+                color = Dim,
+                fontSize = 12.sp,
+            )
+        }
+        Button(
+            onClick = onSetup,
+            colors = ButtonDefaults.buttonColors(
+                containerColor = Color.White,
+                contentColor = Color(0xFF14121F),
+            ),
+        ) {
+            Text("Set up")
+        }
+    }
 }
 
 @Composable
