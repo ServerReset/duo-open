@@ -1,6 +1,8 @@
 package com.duoopen.ui
 
 import android.app.WallpaperManager
+import android.content.ClipData
+import android.content.ClipboardManager
 import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
@@ -156,6 +158,15 @@ fun DuoApp(foldLineFlow: StateFlow<FoldLine?>) {
                 onOpenGuide = {
                     showSheet = false
                     showGuide = true
+                },
+                onCopyReport = {
+                    runCatching {
+                        val cm = context.getSystemService(ClipboardManager::class.java)
+                        cm?.setPrimaryClip(
+                            ClipData.newPlainText("Duo Open sensor report", hinge.sensorReport()),
+                        )
+                    }
+                    Toast.makeText(context, "Sensor report copied", Toast.LENGTH_SHORT).show()
                 },
                 onTestOverlay = {
                     val service = FoldOverlayService.instance

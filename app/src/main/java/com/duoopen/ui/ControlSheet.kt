@@ -47,6 +47,7 @@ fun ControlSheet(
     overlayEnabled: Boolean,
     onEnableOverlay: () -> Unit,
     onOpenGuide: () -> Unit,
+    onCopyReport: () -> Unit,
     onTestOverlay: () -> Unit,
     onDismiss: () -> Unit,
 ) {
@@ -100,6 +101,7 @@ fun ControlSheet(
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
+            TextButton(onClick = onCopyReport) { Text("Copy sensor report") }
 
             Spacer(Modifier.height(12.dp))
 
