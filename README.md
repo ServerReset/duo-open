@@ -146,8 +146,10 @@ settings/DuoSettings.kt                   shared tuning (SharedPreferences + Sta
   screen** shows a live sensor line (`name · Hz · raw · age`) so you can see at
   a glance whether readings are arriving.
 - Some hinges only emit a reading or two per fold rather than a stream. The
-  effect measures how far apart readings arrive and eases across that gap, so
-  it animates smoothly between them instead of jumping from one to the next.
+  overlay and wallpaper ease lightly across active movement, while the in-app
+  preview tracks the value one-to-one so its readout and effect stay in lockstep.
+  Idle pauses are ignored so the easing never stretches out after the phone has
+  been sitting still.
 - The sensor is left registered and untouched — re-registering it to "poll"
   resets some hinges' change detector and starves the feed.
 - The main screen also has the **Simulate hinge** switch and slider, so you can

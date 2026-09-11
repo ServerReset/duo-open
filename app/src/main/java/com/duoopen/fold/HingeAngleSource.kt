@@ -119,7 +119,12 @@ class HingeAngleSource(
 
         if (lastEventUptime != 0L) {
             val gap = (now - lastEventUptime).toFloat()
-            eventGapMs = if (eventGapMs <= 0f) gap else eventGapMs * 0.7f + gap * 0.3f
+            // Only fold-active spacings count. Long idle pauses (phone sitting
+            // still, no reports) must not inflate this, or the renderer eases
+            // for a second after every move and the visual lags the readout.
+            if (gap <= ACTIVE_GAP_MS) {
+                eventGapMs = if (eventGapMs <= 0f) gap else eventGapMs * 0.7f + gap * 0.3f
+            }
         }
         lastEventUptime = now
         rawAngle = raw
@@ -163,5 +168,7 @@ class HingeAngleSource(
         const val FAST_PERIOD_US = 8_000
         /** ~15 Hz under Battery Saver: plenty to follow a fold, far fewer wakeups. */
         const val SLOW_PERIOD_US = 66_000
+        /** Spacings above this are idle pauses, not fold motion, and are ignored. */
+        const val ACTIVE_GAP_MS = 400f
     }
 }
