@@ -157,13 +157,11 @@ settings/DuoSettings.kt                   shared tuning (SharedPreferences + Sta
   `com.samsung.permission.SSENSOR` (`signature|privileged`), so ordinary apps
   can't read it. The app still tries that sensor and reports the denial in
   **Tune → Copy sensor report**.
-- Because of that, the reported angle is a **gyro-assisted estimate**
-  (`fold/FoldMotionEstimator.kt`), the same idea as
-  [`keepYaoung/android-also-could-fold`](https://github.com/keepYaoung/android-also-could-fold):
-  the gyroscope's rotation about the fold axis is integrated between the coarse
-  0/90/180 anchors to drive the effect smoothly. It is a relative estimate, not
-  a measured angle — moving the whole device can contaminate it — so it only
-  starts from a rested endpoint and re-anchors on every hinge reading.
+- Because of that the raw value is smoothed with a light deadband + adaptive
+  low-pass, and the effect only runs between ~175° and closed. A gyro-assisted
+  estimate (like `keepYaoung/android-also-could-fold` uses) was tried and
+  removed: it could latch at a stale mid-angle and freeze the full-screen
+  overlay, so the effect is driven from the raw hinge only.
 - The **main screen** shows the live sensor line (`name · Hz · raw · age`) and
   a **Simulate hinge** switch + slider for previewing without folding.
 
