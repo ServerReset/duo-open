@@ -7,8 +7,6 @@ import android.hardware.SensorEventListener
 import android.hardware.SensorManager
 import android.os.SystemClock
 import android.util.Log
-import kotlin.math.abs
-import kotlin.math.exp
 
 /**
  * Reports the foldable's hinge angle in degrees (0 = closed, 180 = flat).
@@ -61,8 +59,11 @@ class HingeAngleSource(
     var eventGapMs: Float = 0f
         private set
 
-    /** Kept for callers; the gyro estimator is no longer used. */
-    val gyroActive: Boolean get() = false
+    /** True while the gyro is driving the estimate (a confirmed fold). */
+    val gyroActive: Boolean get() = estimator.motionActive
+
+    /** True once a hinge change has confirmed the fold (not a gyro-only tilt). */
+    val gyroConfirmed: Boolean get() = estimator.motionConfirmed
 
     private var started = false
     private var powerSave = false
@@ -89,14 +90,23 @@ class HingeAngleSource(
 
     private val stats = HashMap<String, Stat>()
 
-    // Light adaptive filter state (deadband + low-pass).
-    private var filtered: Float? = null
-    private var previousRaw: Float? = null
-    private var lastFilterUptime = 0L
+    private val gyro: Sensor? = sensorManager?.getDefaultSensor(Sensor.TYPE_GYROSCOPE)
+
+    /** Gyro-assisted estimate; emits through [onAngle]. */
+    private val estimator = FoldMotionEstimator { angle ->
+        lastAngle = angle
+        lastChangeUptime = SystemClock.uptimeMillis()
+        onAngle(angle)
+    }
 
     /** Milliseconds since the last reading, or huge if none yet. */
     fun lastEventAgeMs(): Long =
         if (lastEventUptime == 0L) Long.MAX_VALUE else SystemClock.uptimeMillis() - lastEventUptime
+
+    /** Milliseconds since the reported angle last changed, or huge if never. */
+    fun millisSinceChange(): Long =
+        if (lastChangeUptime == 0L) Long.MAX_VALUE
+        else SystemClock.uptimeMillis() - lastChangeUptime
 
     /** One-line diagnostic for the UI. */
     fun statusText(): String {
@@ -158,9 +168,7 @@ class HingeAngleSource(
         }
         val periodUs = if (powerSave) SensorManager.SENSOR_DELAY_UI else SensorManager.SENSOR_DELAY_GAME
         activeSensor = null
-        filtered = null
-        previousRaw = null
-        lastFilterUptime = 0L
+        estimator.reset()
         for (s in toRegister) {
             // Samsung's folding_angle needs com.samsung.permission.SSENSOR
             // (signature|privileged); if not granted this throws. Catch it.
@@ -177,9 +185,24 @@ class HingeAngleSource(
                     "period=${periodUs}us powerSave=$powerSave ok=$ok",
             )
         }
+        // Gyroscope: integrated between coarse hinge stops to smooth the effect.
+        // It never starts a fold on its own (see FoldMotionEstimator).
+        gyro?.let { g ->
+            val ok = try {
+                sm.registerListener(this, g, 30_000)
+            } catch (e: SecurityException) {
+                false
+            }
+            Log.i(TAG, "gyro name=${g.name} registered=$ok")
+        }
     }
 
     override fun onSensorChanged(event: SensorEvent) {
+        val now = SystemClock.uptimeMillis()
+        if (event.sensor.type == Sensor.TYPE_GYROSCOPE) {
+            estimator.onGyro(event.values.getOrNull(1) ?: 0f, event.timestamp, now)
+            return
+        }
         val rawValue = event.values.firstOrNull() ?: return
         // Samsung's folding_angle declares a 0..1 range but reports the angle
         // normalized; scale it to degrees. Standard sensors are already degrees.
@@ -187,7 +210,6 @@ class HingeAngleSource(
         val raw = rawValue * scale
         // Drop non-angles (state codes, radians) rather than showing garbage.
         if (!raw.isFinite() || raw !in 0f..180f) return
-        val now = SystemClock.uptimeMillis()
 
         val stat = stats.getOrPut(key(event.sensor)) { Stat() }
         stat.update(raw)
@@ -209,9 +231,7 @@ class HingeAngleSource(
             val currentCount = current?.let { stats[key(it)]?.count } ?: 0
             if (current == null || bestCount > currentCount + 3) {
                 activeSensor = best
-                filtered = null
-                previousRaw = null
-                lastFilterUptime = 0L
+                estimator.reset()
                 Log.i(TAG, "active sensor -> ${best.name}")
             }
         }
@@ -227,52 +247,11 @@ class HingeAngleSource(
         rawAngle = raw
         tickRate(now)
 
-        val smooth = filter(raw, now)
-        val changed = lastAngle.isNaN() || abs(smooth - lastAngle) >= CHANGE_EPSILON
-        lastAngle = smooth
-        // Only report a real change, so downstream movement timers reflect the
-        // hinge actually moving — not repeated identical sensor events.
-        if (changed) {
-            lastChangeUptime = now
-            onAngle(smooth)
-        }
+        // Re-anchor the gyro-assisted estimate on this hinge reading.
+        estimator.onHinge(raw, now)
     }
-
-    /** Milliseconds since the angle last changed, or huge if it never has. */
-    fun millisSinceChange(): Long =
-        if (lastChangeUptime == 0L) Long.MAX_VALUE
-        else SystemClock.uptimeMillis() - lastChangeUptime
 
     override fun onAccuracyChanged(sensor: Sensor?, accuracy: Int) = Unit
-
-    /**
-     * Deadband (ignore sub-0.3° noise) plus an adaptive low-pass: heavy on slow
-     * drift, ~12 ms on a real fold. Never snaps across a gap, so a coarse
-     * sensor still animates instead of jumping.
-     */
-    private fun filter(raw: Float, now: Long): Float {
-        val current = filtered
-        val last = lastFilterUptime
-        if (current == null || last == 0L || now < last) {
-            filtered = raw
-            previousRaw = raw
-            lastFilterUptime = now
-            return raw
-        }
-        val elapsed = (now - last).coerceAtLeast(1L)
-        val speed = abs(raw - (previousRaw ?: raw)) * 1000f / elapsed
-        previousRaw = raw
-        lastFilterUptime = now
-
-        if (abs(raw - current) <= DEADBAND_DEG) return current
-        val fast = (speed / 90f).coerceIn(0f, 1f)
-        val adaptive = 65f + (12f - 65f) * fast
-        val tauMillis = maxOf(adaptive, elapsed / 1.2f)
-        val alpha = 1f - exp(-elapsed.toFloat() / tauMillis)
-        val next = current + alpha * (raw - current)
-        filtered = next
-        return next
-    }
 
     private fun tickRate(now: Long) {
         if (rateWindowStart == 0L) rateWindowStart = now
@@ -322,8 +301,6 @@ class HingeAngleSource(
     private companion object {
         const val TAG = "DuoHinge"
         const val DEVICE_PRIVATE_BASE = 0x10000
-        const val DEADBAND_DEG = 0.3f
-        const val CHANGE_EPSILON = 0.05f
         const val ACTIVE_GAP_MS = 1_200f
     }
 }

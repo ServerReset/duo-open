@@ -171,7 +171,7 @@ class FoldOverlayService : AccessibilityService() {
         // Never show the fold while the phone is essentially flat (>=175°), and
         // never while the raw sensor sits at the open endpoint with no gyro
         // motion — that is a stuck/false reading, not a fold.
-        if (angle > TRIGGER_HINGE || (hinge.rawAngle >= 179f && !hinge.gyroActive)) {
+        if (angle > TRIGGER_HINGE || (hinge.rawAngle >= 179f && !hinge.gyroConfirmed)) {
             restArmed = true
             panelSwitched = false
             if (phase == Phase.SHOWING) dismiss(fadeMs = FADE_OUT_FLAT_MS)
@@ -223,7 +223,7 @@ class FoldOverlayService : AccessibilityService() {
         }
         // Same flat/stuck guard as onHinge: no capture while >=175° or while the
         // raw sensor sits at the open endpoint with no gyro motion.
-        if (angle > TRIGGER_HINGE || (hinge.rawAngle >= 179f && !hinge.gyroActive)) {
+        if (angle > TRIGGER_HINGE || (hinge.rawAngle >= 179f && !hinge.gyroConfirmed)) {
             restArmed = true
             panelSwitched = false
             return
