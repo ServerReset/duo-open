@@ -150,6 +150,14 @@ settings/DuoSettings.kt                   shared tuning (SharedPreferences + Sta
   coarse one.
 - Jitter is removed with a 0.3° deadband plus an adaptive low-pass (heavier on
   slow drift, ~12 ms on a real fold), the same filter `android-duo` uses.
+- **Galaxy Z Fold 7 (SM-F971N) limitation:** its only readable hinge sensor
+  (`android.sensor.hinge_angle`, type 36) reports just **0 / 90 / 180** — the
+  Android CDD only requires two distinct values, and Samsung's real continuous
+  angle sensor (`com.samsung.sensor.folding_angle`, type 65686) is gated behind
+  `com.samsung.permission.SSENSOR` (`signature|privileged`), so ordinary apps
+  can't read it. The app still tries that sensor and reports the denial in
+  **Tune → Copy sensor report**. With only three stops, the effect can only
+  interpolate between them.
 - The **main screen** shows the live sensor line (`name · Hz · raw · age`) and
   a **Simulate hinge** switch + slider for previewing without folding.
 

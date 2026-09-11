@@ -161,7 +161,15 @@ class HingeAngleSource(
         previousRaw = null
         lastFilterUptime = 0L
         for (s in toRegister) {
-            val ok = sm.registerListener(this, s, periodUs)
+            // Samsung's continuous folding_angle needs com.samsung.permission.SSENSOR
+            // (signature|privileged); if it is not granted this throws. Catch it
+            // instead of crashing and log it so the report shows the denial.
+            val ok = try {
+                sm.registerListener(this, s, periodUs)
+            } catch (e: SecurityException) {
+                Log.w(TAG, "register denied for ${s.name}: ${e.message}")
+                false
+            }
             Log.i(
                 TAG,
                 "candidate name=${s.name} type=${s.stringType} wakeUp=${s.isWakeUpSensor} " +
@@ -172,7 +180,11 @@ class HingeAngleSource(
     }
 
     override fun onSensorChanged(event: SensorEvent) {
-        val raw = event.values.firstOrNull() ?: return
+        val rawValue = event.values.firstOrNull() ?: return
+        // Samsung's folding_angle declares a 0..1 range but reports the angle
+        // normalized; scale it to degrees. Standard sensors are already degrees.
+        val scale = scaleFor(event.sensor, rawValue)
+        val raw = rawValue * scale
         // Drop non-angles (state codes, radians) rather than showing garbage.
         if (!raw.isFinite() || raw !in 0f..180f) return
         val now = SystemClock.uptimeMillis()
@@ -271,6 +283,10 @@ class HingeAngleSource(
 
     /** A real hinge *angle* sensor: standard type, or a vendor sensor with an angle range. */
     private fun isAngleCandidate(s: Sensor): Boolean {
+        val text = (s.name + " " + s.stringType).lowercase()
+        // Samsung's real continuous folding angle (protected; may be denied on
+        // register). Try it even though it declares a 0..1 range.
+        if (text.contains("folding_angle")) return true
         val range = s.maximumRange
         if (!range.isFinite() || range !in 150f..360f) return false
         if (s.reportingMode != Sensor.REPORTING_MODE_CONTINUOUS &&
@@ -280,8 +296,16 @@ class HingeAngleSource(
         }
         if (s.type == Sensor.TYPE_HINGE_ANGLE) return true
         if (s.type < DEVICE_PRIVATE_BASE) return false
-        val text = (s.name + " " + s.stringType).lowercase()
         return (text.contains("hinge") || text.contains("fold")) && text.contains("angle")
+    }
+
+    /**
+     * A sensor declaring a 0..1 range reports a normalized fraction; scale to
+     * degrees. Standard angle sensors (range 150°+) are already degrees.
+     */
+    private fun scaleFor(s: Sensor, value: Float): Float {
+        val smallRange = s.maximumRange.isFinite() && s.maximumRange in 0.1f..1.5f
+        return if (smallRange && value <= 1.5f) 180f else 1f
     }
 
     private fun isFoldRelated(s: Sensor): Boolean {
