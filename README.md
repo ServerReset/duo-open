@@ -140,22 +140,18 @@ settings/DuoSettings.kt                   shared tuning (SharedPreferences + Sta
 
 ## Galaxy Z Fold notes
 
-- Samsung exposes the hinge through the platform `TYPE_HINGE_ANGLE` sensor
-  (usually alongside a wake-up variant). The app registers all of them and uses
-  whichever actually streams the widest range of angles. The **main screen**
-  shows the live sensor line (`name · Hz · raw · age · range`).
-- Samsung's hinge sensor reports **posture angles only** — 0° closed, 90° flex,
-  180° open — not a continuous angle. So the value used for both the readout
-  and the effect is eased between readings (over the measured spacing, with
-  idle pauses excluded), which animates like the simulator instead of jumping
-  between three stops.
-- Every hinge sensor the device exposes is registered and scored (reading
-  count and angle range); the best one is used. The listener is left registered
-  and untouched — re-registering it to "poll" resets some hinges' change
-  detector and starves the feed.
-- The main screen also has the **Simulate hinge** switch and slider, so you can
-  play the effect and watch it in real time without folding (handy when the
-  Accessibility service isn't enabled yet).
+- Sensor selection follows the apps known to work on Samsung
+  (`sururu-k/HingeNotifier` on the Galaxy Z Fold 4, `Nemoyuzx/android-duo`): use
+  the standard `TYPE_HINGE_ANGLE`, prefer the non-wake-up variant, and register
+  only that one at `SENSOR_DELAY_GAME`. Vendor sensors are accepted only when
+  their reported range really is an angle (150°+), which rejects the coarse
+  wake-up sensor that only reports 0/90/180 and the 0/1 state sensors.
+  Registering every hinge candidate at once is what previously latched onto the
+  coarse one.
+- Jitter is removed with a 0.3° deadband plus an adaptive low-pass (heavier on
+  slow drift, ~12 ms on a real fold), the same filter `android-duo` uses.
+- The **main screen** shows the live sensor line (`name · Hz · raw · age`) and
+  a **Simulate hinge** switch + slider for previewing without folding.
 
 ## License
 
