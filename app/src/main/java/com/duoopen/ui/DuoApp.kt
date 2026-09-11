@@ -126,7 +126,9 @@ fun DuoApp(foldLineFlow: StateFlow<FoldLine?>) {
         if (showSheet) {
             ControlSheet(
                 config = config,
-                sensorName = hinge.sensor?.name,
+                sensorName = hinge.sensors.takeIf { it.isNotEmpty() }?.joinToString("\n") {
+                    "${it.name} (${if (it.isWakeUpSensor) "wake-up" else "continuous"})"
+                },
                 hingeAngle = angle,
                 paneTilt = paneTilt,
                 simulate = simulate,

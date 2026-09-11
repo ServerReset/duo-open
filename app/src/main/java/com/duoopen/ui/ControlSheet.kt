@@ -96,7 +96,7 @@ fun ControlSheet(
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
             Text(
-                "Hinge ${if (hingeAngle.isNaN()) "—" else "${hingeAngle.roundToInt()}°"}  ·  pane tilt %.1f°".format(paneTilt),
+                "Hinge ${if (hingeAngle.isNaN()) "—" else "%.1f°".format(hingeAngle)}  ·  pane tilt %.1f°".format(paneTilt),
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )

@@ -2,9 +2,10 @@
 
 The iPhone "Duo" frosted-glass fold, playing system-wide on a book-style
 foldable as you open and close it. Driven by the real hinge angle — no root.
-Built and tested on the OnePlus Open; should work on other Android 13+
-foldables with a hinge sensor (Pixel Fold, Galaxy Z Fold, OPPO Find N…) but
-those are untested — reports welcome.
+Built and tested on the OnePlus Open; Pixel Fold, Galaxy Z Fold, OPPO Find N
+and friends use the same platform `TYPE_HINGE_ANGLE` sensor and work too, with
+a vendor-tolerant sensor picker and an adaptive filter that turns the Galaxy Z
+Fold's stepped, slightly noisy readings into a smooth live curve.
 
 Based on the AGSL shader from
 [Atomicx7/Duo-animation](https://github.com/Atomicx7/Duo-animation).
@@ -81,8 +82,9 @@ watch it with `adb logcat -s DuoOverlay`.
 ```
 app/src/main/res/raw/duo_unfold.agsl      fold shader (hinge line, moving side, eye)
 fold/DuoShader.kt                         uniforms, hinge→tilt mapping, fold placement
-fold/HingeAngleSource.kt                  TYPE_HINGE_ANGLE (wake-up fallback, vendor fallback)
-fold/TiltFollower.kt                      per-vsync ease that hides the sensor's 1° steps
+fold/HingeAngleSource.kt                  TYPE_HINGE_ANGLE discovery + vendor fallback
+fold/AngleFilter.kt                       adaptive 1€ filter: live, jitter-free angle
+fold/TiltFollower.kt                      per-vsync ease that hides the sensor's steps
 fold/Panels.kt                            inner vs cover panel from the display mode
 overlay/FoldOverlayService.kt             accessibility service: screenshot + overlay
 overlay/FoldOverlayView.kt                draws the snapshot through the shader (half-res layer)
@@ -99,6 +101,16 @@ settings/DuoSettings.kt                   shared tuning (SharedPreferences + Sta
 - The hinge sensor is wake-up only and sends nothing on registration, goes
   quiet at ~30° during a close, and idles anywhere from 0–5° when shut. The
   service compensates for all three.
+
+## Galaxy Z Fold notes
+
+- Samsung exposes the hinge through the platform `TYPE_HINGE_ANGLE` sensor
+  (usually alongside a wake-up variant). The app lists every hinge sensor it
+  finds on the **Tune** sheet and prefers the continuous one.
+- Its readings arrive in coarse steps with a little noise, so the raw value is
+  run through an adaptive 1€ filter (`fold/AngleFilter.kt`): heavy smoothing at
+  rest, light while the hinge moves. The **Tune** readout shows one decimal, so
+  live motion is visible instead of jumping whole degrees.
 
 ## License
 

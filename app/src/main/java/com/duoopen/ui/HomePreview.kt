@@ -41,7 +41,6 @@ import androidx.compose.ui.unit.sp
 import kotlinx.coroutines.delay
 import java.time.LocalDateTime
 import java.time.format.DateTimeFormatter
-import kotlin.math.roundToInt
 
 private val Glass = Color.White.copy(alpha = 0.14f)
 private val GlassEdge = Color.White.copy(alpha = 0.22f)
@@ -102,7 +101,7 @@ fun HomePreview(
             Spacer(Modifier.height(28.dp))
 
             Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                StatTile("Hinge", if (hingeAngle.isNaN()) "—" else "${hingeAngle.roundToInt()}°")
+                StatTile("Hinge", if (hingeAngle.isNaN()) "—" else "%.1f°".format(hingeAngle))
                 StatTile("Pane tilt", "%.1f°".format(paneTilt))
                 StatTile("State", if (paneTilt < 0.05f) "Flat" else "Folding")
             }
@@ -187,7 +186,7 @@ private fun HingeReadout(hingeAngle: Float, paneTilt: Float, simulated: Boolean)
             )
             Spacer(Modifier.height(6.dp))
             Text(
-                if (hingeAngle.isNaN()) "—" else "${hingeAngle.roundToInt()}°",
+                if (hingeAngle.isNaN()) "—" else "%.1f°".format(hingeAngle),
                 color = Color.White,
                 fontSize = 64.sp,
                 fontWeight = FontWeight.Bold,
