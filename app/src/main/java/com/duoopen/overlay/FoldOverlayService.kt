@@ -71,6 +71,25 @@ class FoldOverlayService : AccessibilityService() {
     private var lastEvaluateMs = 0L
     /** When the current overlay started showing, for the max-show safety. */
     private var shownSinceMs = 0L
+    /** True while a refresh screenshot is in flight. */
+    private var refreshing = false
+
+    /**
+     * While the overlay is up and the hinge is still moving, periodically grab a
+     * fresh frame so the paused content keeps up instead of looking frozen. The
+     * overlay is hidden for the capture (a screenshot would otherwise include it)
+     * and restored immediately after.
+     */
+    private val refreshCheck = object : Runnable {
+        override fun run() {
+            val view = overlay
+            if (view == null || phase != Phase.SHOWING) return
+            if (!demoRunning && SystemClock.uptimeMillis() - lastHingeMoveMs < MOVE_WINDOW_MS) {
+                refreshSnapshot(view)
+            }
+            handler.postDelayed(this, REFRESH_INTERVAL_MS)
+        }
+    }
     private var demoRunning = false
     /** Bumped per capture so a late or hung screenshot can't act on a newer phase. */
     private var captureGen = 0
@@ -410,6 +429,7 @@ class FoldOverlayService : AccessibilityService() {
         overlay = view
         phase = Phase.SHOWING
         shownSinceMs = SystemClock.uptimeMillis()
+        handler.postDelayed(refreshCheck, REFRESH_INTERVAL_MS)
         OverlayState.setRunning(true)
         if (fadeIn) {
             // Content was already live on this panel; ease the frost in.
@@ -437,6 +457,7 @@ class FoldOverlayService : AccessibilityService() {
         val view = overlay ?: return
         Log.i(TAG, "dismiss (fade ${fadeMs}ms) at tilt=${view.tilt}")
         handler.removeCallbacks(settleCheck)
+        handler.removeCallbacks(refreshCheck)
         follower?.cancel()
         follower = null
         overlay = null
@@ -455,6 +476,7 @@ class FoldOverlayService : AccessibilityService() {
         timedResolve = false
         val view = overlay ?: return
         handler.removeCallbacks(settleCheck)
+        handler.removeCallbacks(refreshCheck)
         follower?.cancel()
         follower = null
         overlay = null
@@ -464,6 +486,35 @@ class FoldOverlayService : AccessibilityService() {
     private fun detach(view: FoldOverlayView) {
         runCatching { windowManager?.removeViewImmediate(view) }
         OverlayState.setRunning(false)
+    }
+
+    private fun refreshSnapshot(view: FoldOverlayView) {
+        if (refreshing) return
+        refreshing = true
+        view.visibility = android.view.View.INVISIBLE
+        // Give the compositor a frame to drop the overlay, then capture clean.
+        handler.postDelayed({
+            if (phase != Phase.SHOWING) {
+                refreshing = false
+                runCatching { view.visibility = android.view.View.VISIBLE }
+                return@postDelayed
+            }
+            takeScreenshot(Display.DEFAULT_DISPLAY, mainExecutor, object : TakeScreenshotCallback {
+                override fun onSuccess(result: ScreenshotResult) {
+                    val buffer = result.hardwareBuffer
+                    val bitmap = Bitmap.wrapHardwareBuffer(buffer, result.colorSpace)
+                    buffer.close()
+                    if (bitmap != null && phase == Phase.SHOWING) view.updateSnapshot(bitmap)
+                    runCatching { view.visibility = android.view.View.VISIBLE }
+                    refreshing = false
+                }
+
+                override fun onFailure(errorCode: Int) {
+                    runCatching { view.visibility = android.view.View.VISIBLE }
+                    refreshing = false
+                }
+            })
+        }, REFRESH_HIDE_MS)
     }
 
     /**
@@ -527,6 +578,10 @@ class FoldOverlayService : AccessibilityService() {
         private const val MOVE_WINDOW_MS = 500L
         /** Hard cap on a single overlay showing, so it can never stay stuck. */
         private const val MAX_SHOW_MS = 3_000L
+        /** How often to refresh the frozen frame while the hinge is moving. */
+        private const val REFRESH_INTERVAL_MS = 400L
+        /** Frames to wait after hiding the overlay before the clean capture. */
+        private const val REFRESH_HIDE_MS = 32L
         private const val FADE_IN_MS = 140L
         private const val FADE_OUT_FLAT_MS = 120L
         private const val FADE_OUT_STALLED_MS = 300L

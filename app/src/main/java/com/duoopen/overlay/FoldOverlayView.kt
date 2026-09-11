@@ -51,6 +51,12 @@ class FoldOverlayView(
             fold.config = value
         }
 
+    /** Replaces the frozen screenshot with a newer one, keeping the effect. */
+    fun updateSnapshot(bitmap: Bitmap) {
+        flat.update(bitmap)
+        fold.update(bitmap)
+    }
+
     init {
         setBackgroundColor(Color.BLACK)
         addView(flat)
@@ -78,15 +84,28 @@ class FoldOverlayView(
     private fun exactly(px: Int) = MeasureSpec.makeMeasureSpec(px, MeasureSpec.EXACTLY)
 
     /** Snapshot drawn 1:1 — pixel-identical to the live screen underneath. */
-    private class FlatView(context: Context, private val snapshot: Bitmap) : View(context) {
+    private class FlatView(context: Context, private var snapshot: Bitmap) : View(context) {
         private val paint = Paint(Paint.FILTER_BITMAP_FLAG)
-        private val shader = BitmapShader(snapshot, Shader.TileMode.CLAMP, Shader.TileMode.CLAMP)
+        private var shader = BitmapShader(snapshot, Shader.TileMode.CLAMP, Shader.TileMode.CLAMP)
         private val matrix = Matrix()
 
         override fun onSizeChanged(w: Int, h: Int, oldw: Int, oldh: Int) {
+            applyMatrix(w, h)
+            paint.shader = shader
+        }
+
+        /** Swaps in a fresh screenshot while the overlay stays on screen. */
+        fun update(bitmap: Bitmap) {
+            snapshot = bitmap
+            shader = BitmapShader(bitmap, Shader.TileMode.CLAMP, Shader.TileMode.CLAMP)
+            if (width > 0 && height > 0) applyMatrix(width, height)
+            paint.shader = shader
+            invalidate()
+        }
+
+        private fun applyMatrix(w: Int, h: Int) {
             matrix.setScale(w / snapshot.width.toFloat(), h / snapshot.height.toFloat())
             shader.setLocalMatrix(matrix)
-            paint.shader = shader
         }
 
         override fun onDraw(canvas: Canvas) {
@@ -97,14 +116,14 @@ class FoldOverlayView(
     /** Snapshot through the fold shader, at reduced resolution. */
     private class FoldView(
         context: Context,
-        private val snapshot: Bitmap,
+        private var snapshot: Bitmap,
         renderScale: Float,
         private val foldLine: ((w: Float, h: Float, config: DuoConfig) -> FoldLine)?,
     ) : View(context) {
         private val shader: RuntimeShader? = DuoShader.create(context)
         private val pxPerMm = DuoShader.pxPerMm(context) / renderScale
         private val paint = Paint(Paint.FILTER_BITMAP_FLAG)
-        private val image = BitmapShader(snapshot, Shader.TileMode.DECAL, Shader.TileMode.DECAL)
+        private var image = BitmapShader(snapshot, Shader.TileMode.DECAL, Shader.TileMode.DECAL)
         private val matrix = Matrix()
 
         var config: DuoConfig = DuoSettings.config.value
@@ -118,6 +137,18 @@ class FoldOverlayView(
             }
 
         override fun onSizeChanged(w: Int, h: Int, oldw: Int, oldh: Int) {
+            applyMatrix(w, h)
+        }
+
+        /** Swaps in a fresh screenshot while the overlay stays on screen. */
+        fun update(bitmap: Bitmap) {
+            snapshot = bitmap
+            image = BitmapShader(bitmap, Shader.TileMode.DECAL, Shader.TileMode.DECAL)
+            if (width > 0 && height > 0) applyMatrix(width, height)
+            invalidate()
+        }
+
+        private fun applyMatrix(w: Int, h: Int) {
             matrix.setScale(w / snapshot.width.toFloat(), h / snapshot.height.toFloat())
             image.setLocalMatrix(matrix)
         }
