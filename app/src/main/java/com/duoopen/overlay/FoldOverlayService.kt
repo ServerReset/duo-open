@@ -169,6 +169,7 @@ class FoldOverlayService : AccessibilityService() {
             // At rest: drop the overlay now rather than easing the last degrees.
             dismiss(fadeMs = FADE_OUT_FLAT_MS)
         } else {
+            if (!demoRunning) follower?.tauS = TiltFollower.tauForGap(hinge.eventGapMs)
             follower?.setTarget(tilt)
         }
     }
@@ -381,7 +382,10 @@ class FoldOverlayService : AccessibilityService() {
         follower = TiltFollower { t ->
             view.tilt = t
             if (t < DuoShader.FLAT_EPSILON && !demoRunning) dismiss(fadeMs = FADE_OUT_FLAT_MS)
-        }.also { it.snap(startTilt) }
+        }.also {
+            it.snap(startTilt)
+            it.tauS = TiltFollower.tauForGap(hinge.eventGapMs)
+        }
         lastHingeMoveMs = SystemClock.uptimeMillis()
         timedResolve = timed
         if (timed) {

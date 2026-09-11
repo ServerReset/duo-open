@@ -66,5 +66,16 @@ class TiltFollower(private val onFrame: (tilt: Float) -> Unit) : Choreographer.F
          * steps without a perceptible lag behind the hinge.
          */
         const val DEFAULT_TAU_S = 0.02f
+
+        /**
+         * Picks a time constant from how far apart readings are. A streaming
+         * hinge gets a snappy [DEFAULT_TAU_S]-ish ease; a hinge that only
+         * reports a couple of times per fold gets a longer ease so the effect
+         * animates across the gap instead of jumping.
+         */
+        fun tauForGap(gapMs: Float): Float {
+            val gap = if (gapMs > 0f) gapMs else 250f
+            return (gap / 1000f / 2.2f).coerceIn(0.02f, 0.3f)
+        }
     }
 }

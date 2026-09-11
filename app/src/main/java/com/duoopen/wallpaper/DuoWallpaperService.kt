@@ -117,7 +117,12 @@ class DuoWallpaperService : WallpaperService() {
 
         private fun onHingeAngle(angle: Float) {
             val tilt = tiltFor(angle)
-            if (isInner() && isVisible && surfaceReady) follower.setTarget(tilt) else follower.snap(tilt)
+            if (isInner() && isVisible && surfaceReady) {
+                follower.tauS = TiltFollower.tauForGap(hinge.eventGapMs)
+                follower.setTarget(tilt)
+            } else {
+                follower.snap(tilt)
+            }
         }
 
         /** Battery Saver: sample slowly and ease longer so we draw fewer frames. */

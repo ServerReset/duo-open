@@ -10,6 +10,8 @@ import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
@@ -73,9 +75,16 @@ fun DuoApp(foldLineFlow: StateFlow<FoldLine?>) {
     LocalConfiguration.current
     val onCover = !simulate && hinge.sensor != null && !context.display.isInnerPanel()
     val targetTilt = if (angle.isNaN() || onCover) 0f else DuoShader.tiltForHinge(angle, config)
-    // Drive the effect straight from the sensor value — no spring/animation
-    // layer, so it reacts the instant the hinge moves.
-    val paneTilt = targetTilt
+    // Ease across however far apart the hinge's readings are: a streaming
+    // hinge settles in ~50ms, while a hinge that only reports a couple of
+    // times per fold animates smoothly over the gap instead of jumping.
+    val gapMs = if (hinge.eventGapMs > 0f) hinge.eventGapMs else 250f
+    val tweenMs = (gapMs * 1.3f).coerceIn(50f, 600f).toInt()
+    val paneTilt by animateFloatAsState(
+        targetValue = targetTilt,
+        animationSpec = tween(durationMillis = tweenMs),
+        label = "paneTilt",
+    )
 
     val shader = remember { DuoShader.create(context) }
     // In Battery Saver the preview stays flat too, matching the services.

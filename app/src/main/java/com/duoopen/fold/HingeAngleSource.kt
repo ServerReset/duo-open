@@ -5,22 +5,21 @@ import android.hardware.Sensor
 import android.hardware.SensorEvent
 import android.hardware.SensorEventListener
 import android.hardware.SensorManager
-import android.os.Handler
-import android.os.Looper
 import android.os.SystemClock
 import android.util.Log
 
 /**
- * Reports the foldable's hinge angle in degrees (0 = closed, 180 = flat),
- * passing the raw sensor value straight through so the effect tracks the hinge
- * in real time — no smoothing or lag.
+ * Reports the foldable's hinge angle in degrees (0 = closed, 180 = flat).
  *
  * Sensor choice matches the original app: the platform `TYPE_HINGE_ANGLE`
  * sensor (continuous before wake-up), then any vendor sensor whose type or name
- * mentions "hinge". A slow keep-alive re-registers the listener if readings go
- * quiet, which forces the HAL to hand back the current angle on the quirky
- * hinges that report once and then stay silent — that's what keeps the display
- * live instead of only updating when the app is reopened.
+ * mentions "hinge". Values are passed straight through, and [eventGapMs]
+ * reports how far apart readings typically are so the renderer can ease across
+ * the gap — important because several hinges only emit a couple of readings per
+ * fold rather than a continuous stream.
+ *
+ * The listener is left registered and untouched; re-registering to "poll" turns
+ * out to reset some hinges' change detector and starves the feed.
  */
 class HingeAngleSource(
     context: Context,
@@ -28,12 +27,11 @@ class HingeAngleSource(
 ) : SensorEventListener {
 
     private val sensorManager = context.getSystemService(SensorManager::class.java)
-    private val handler = Handler(Looper.getMainLooper())
 
     /** Every hinge-capable sensor found, best candidate first. */
     val sensors: List<Sensor> = sensorManager?.let(::findHingeSensors).orEmpty()
 
-    /** The sensor being read. */
+    /** The preferred sensor. */
     val sensor: Sensor? = sensors.firstOrNull()
 
     /** Same as [sensor]; kept so the UI has one obvious "active" name. */
@@ -51,25 +49,18 @@ class HingeAngleSource(
     var rateHz: Float = 0f
         private set
 
+    /**
+     * Smoothed spacing between readings, in ms. Small when the hinge streams,
+     * large when it only reports a few times per fold.
+     */
+    var eventGapMs: Float = 0f
+        private set
+
     private var started = false
     private var powerSave = false
     private var lastEventUptime = 0L
     private var rateWindowStart = 0L
     private var rateWindowCount = 0
-
-    private val keepAlive = object : Runnable {
-        override fun run() {
-            if (!started || sensor == null) return
-            // If no reading has arrived since the last poll, force one by
-            // re-registering. On hinges that report once and then go quiet
-            // (or only fire at a coarse cadence) this is what turns the effect
-            // from a slow staircase into a continuous, live feed.
-            if (SystemClock.uptimeMillis() - lastEventUptime >= POLL_STALE_MS) {
-                reRegister()
-            }
-            handler.postDelayed(this, POLL_INTERVAL_MS)
-        }
-    }
 
     /** Milliseconds since the last reading, or [Long.MAX_VALUE] if none yet. */
     fun lastEventAgeMs(): Long =
@@ -88,59 +79,48 @@ class HingeAngleSource(
     fun start() {
         if (started) return
         started = true
-        if (sensor == null) {
-            Log.w(TAG, "no hinge sensor found")
-            return
-        }
         register()
-        handler.postDelayed(keepAlive, POLL_INTERVAL_MS)
     }
 
-    /**
-     * Re-registers at a much lower rate while the system is in Battery Saver,
-     * so the wallpaper still tracks a fold without the high-rate wakeups.
-     */
+    /** Re-registers at a lower rate while the system is in Battery Saver. */
     fun setPowerSave(enabled: Boolean) {
         if (powerSave == enabled) return
         powerSave = enabled
         if (!started) return
-        reRegister()
+        sensorManager?.unregisterListener(this)
+        register()
     }
 
     fun stop() {
         if (!started) return
         started = false
-        handler.removeCallbacks(keepAlive)
         sensorManager?.unregisterListener(this)
     }
 
-    private fun reRegister() {
-        sensorManager?.unregisterListener(this)
-        register(verbose = false)
-    }
-
-    private fun register(verbose: Boolean = true) {
+    private fun register() {
         val s = sensor ?: run {
             Log.w(TAG, "no hinge sensor found")
             return
         }
-        val target = if (powerSave) SLOW_PERIOD_US else FAST_PERIOD_US
-        val periodUs = if (s.minDelay > target) s.minDelay else target
+        val periodUs = if (powerSave) SLOW_PERIOD_US else FAST_PERIOD_US
         val ok = sensorManager?.registerListener(this, s, periodUs) == true
-        if (verbose) {
-            Log.i(
-                TAG,
-                "hinge sensor=${s.name} type=${s.stringType} wakeUp=${s.isWakeUpSensor} " +
-                    "reportingMode=${s.reportingMode} minDelay=${s.minDelay}us " +
-                    "period=${periodUs}us powerSave=$powerSave ok=$ok",
-            )
-        }
+        Log.i(
+            TAG,
+            "hinge sensor=${s.name} type=${s.stringType} wakeUp=${s.isWakeUpSensor} " +
+                "reportingMode=${s.reportingMode} minDelay=${s.minDelay}us " +
+                "period=${periodUs}us powerSave=$powerSave ok=$ok",
+        )
     }
 
     override fun onSensorChanged(event: SensorEvent) {
         val raw = event.values.firstOrNull() ?: return
         if (!raw.isFinite()) return
         val now = SystemClock.uptimeMillis()
+
+        if (lastEventUptime != 0L) {
+            val gap = (now - lastEventUptime).toFloat()
+            eventGapMs = if (eventGapMs <= 0f) gap else eventGapMs * 0.7f + gap * 0.3f
+        }
         lastEventUptime = now
         rawAngle = raw
         lastAngle = raw
@@ -179,13 +159,9 @@ class HingeAngleSource(
 
     private companion object {
         const val TAG = "DuoHinge"
-        /** 0 = fastest the sensor allows (clamped to minDelay), for instant tracking. */
-        const val FAST_PERIOD_US = 0
+        /** Original 125 Hz registration; left alone so the hinge keeps streaming. */
+        const val FAST_PERIOD_US = 8_000
         /** ~15 Hz under Battery Saver: plenty to follow a fold, far fewer wakeups. */
         const val SLOW_PERIOD_US = 66_000
-        /** Poll at ~60 fps so the effect never waits on a sparse hinge feed. */
-        const val POLL_INTERVAL_MS = 16L
-        /** No reading for this long means the sensor stalled; force one. */
-        const val POLL_STALE_MS = 30L
     }
 }

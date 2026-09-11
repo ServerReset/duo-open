@@ -145,9 +145,11 @@ settings/DuoSettings.kt                   shared tuning (SharedPreferences + Sta
   first, then a wake-up/vendor one, and reads it at full rate. The **main
   screen** shows a live sensor line (`name · Hz · raw · age`) so you can see at
   a glance whether readings are arriving.
-- Some hinges report once on registration and then stay quiet. The app polls
-  by re-registering the sensor whenever no reading has arrived for ~30 ms, so
-  the angle keeps flowing at display rate instead of stepping or stalling.
+- Some hinges only emit a reading or two per fold rather than a stream. The
+  effect measures how far apart readings arrive and eases across that gap, so
+  it animates smoothly between them instead of jumping from one to the next.
+- The sensor is left registered and untouched — re-registering it to "poll"
+  resets some hinges' change detector and starves the feed.
 - The main screen also has the **Simulate hinge** switch and slider, so you can
   play the effect and watch it in real time without folding (handy when the
   Accessibility service isn't enabled yet).
