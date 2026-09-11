@@ -250,12 +250,12 @@ class HingeAngleSource(
         lastFilterUptime = now
 
         if (abs(raw - current) <= DEADBAND_DEG) return current
-        if (elapsed > 250L) {
-            filtered = raw
-            return raw
-        }
         val fast = (speed / 90f).coerceIn(0f, 1f)
-        val tauMillis = 65f + (12f - 65f) * fast
+        val adaptive = 65f + (12f - 65f) * fast
+        // Sparse posture sensors (0/90/180) report only a few times per fold, so
+        // spread each change across the measured gap — never snap — or the
+        // effect jumps. Streaming sensors keep the fast adaptive constant.
+        val tauMillis = maxOf(adaptive, elapsed / 1.2f)
         val alpha = 1f - exp(-elapsed.toFloat() / tauMillis)
         val next = current + alpha * (raw - current)
         filtered = next
