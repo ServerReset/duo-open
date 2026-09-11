@@ -456,7 +456,6 @@ class FoldOverlayService : AccessibilityService() {
 
     private fun detach(view: FoldOverlayView) {
         runCatching { windowManager?.removeViewImmediate(view) }
-        runCatching { view.release() }
         OverlayState.setRunning(false)
     }
 
