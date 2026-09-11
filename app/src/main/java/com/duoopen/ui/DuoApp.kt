@@ -16,7 +16,6 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableIntStateOf
@@ -40,6 +39,7 @@ import com.duoopen.fold.HingeAngleSource
 import com.duoopen.fold.isInnerPanel
 import com.duoopen.overlay.FoldOverlayService
 import com.duoopen.overlay.OverlayState
+import com.duoopen.power.PowerState
 import com.duoopen.settings.DuoSettings
 import com.duoopen.wallpaper.DuoWallpaperService
 import com.duoopen.wallpaper.WallpaperImage
@@ -57,10 +57,13 @@ fun DuoApp(foldLineFlow: StateFlow<FoldLine?>) {
 
     var hingeAngle by remember { mutableFloatStateOf(Float.NaN) }
     val hinge = remember { HingeAngleSource(context.applicationContext) { hingeAngle = it } }
-    DisposableEffect(hinge) {
+    // Only listen while the app is in front; a backgrounded preview has no
+    // reason to wake up on every hinge move.
+    LifecycleResumeEffect(hinge) {
         hinge.start()
-        onDispose { hinge.stop() }
+        onPauseOrDispose { hinge.stop() }
     }
+    val batterySaver by PowerState.batterySaver.collectAsStateWithLifecycle()
 
     // Without a hinge sensor (emulator, non-foldable) the slider is the only input.
     var simulate by rememberSaveable { mutableStateOf(hinge.sensor == null) }
@@ -77,6 +80,8 @@ fun DuoApp(foldLineFlow: StateFlow<FoldLine?>) {
     )
 
     val shader = remember { DuoShader.create(context) }
+    // In Battery Saver the preview stays flat too, matching the services.
+    val effectReduced = batterySaver && config.powerSaveReducesEffect
     val pxPerMm = remember(context) { DuoShader.pxPerMm(context) }
     val image by produceState<ImageBitmap?>(null, config.imageVersion) {
         value = withContext(Dispatchers.IO) {
@@ -113,10 +118,11 @@ fun DuoApp(foldLineFlow: StateFlow<FoldLine?>) {
             hingeAngle = angle,
             paneTilt = paneTilt,
             simulated = simulate,
+            batterySaverReduced = effectReduced,
             wallpaperActive = wallpaperActive,
             onSetWallpaper = setWallpaper,
             onTune = { showSheet = true },
-            modifier = if (shader != null && !overlayRunning) {
+            modifier = if (shader != null && !overlayRunning && !effectReduced) {
                 Modifier.foldEffect(shader, { paneTilt }, config, pxPerMm, foldLine)
             } else {
                 Modifier

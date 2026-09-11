@@ -34,6 +34,8 @@ data class DuoConfig(
     val movingSide: Int = -1,
     val coverFrostFromRight: Boolean = true,
     val imageVersion: Long = 0L,
+    /** Skip the full-screen overlay (and slow the sensor) in Android Battery Saver. */
+    val powerSaveReducesEffect: Boolean = true,
 )
 
 object DuoSettings {
@@ -55,6 +57,7 @@ object DuoSettings {
             movingSide = prefs.getInt("movingSide", d.movingSide),
             coverFrostFromRight = prefs.getBoolean("coverFrostFromRight", d.coverFrostFromRight),
             imageVersion = prefs.getLong("imageVersion", d.imageVersion),
+            powerSaveReducesEffect = prefs.getBoolean("powerSaveReducesEffect", d.powerSaveReducesEffect),
         )
     }
 
@@ -71,6 +74,7 @@ object DuoSettings {
             putInt("movingSide", next.movingSide)
             putBoolean("coverFrostFromRight", next.coverFrostFromRight)
             putLong("imageVersion", next.imageVersion)
+            putBoolean("powerSaveReducesEffect", next.powerSaveReducesEffect)
         }
     }
 
@@ -81,6 +85,7 @@ object DuoSettings {
             movingSide = it.movingSide,
             coverFrostFromRight = it.coverFrostFromRight,
             imageVersion = it.imageVersion,
+            powerSaveReducesEffect = it.powerSaveReducesEffect,
         )
     }
 }

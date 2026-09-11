@@ -57,6 +57,7 @@ fun HomePreview(
     hingeAngle: Float,
     paneTilt: Float,
     simulated: Boolean,
+    batterySaverReduced: Boolean,
     wallpaperActive: Boolean,
     onSetWallpaper: () -> Unit,
     onTune: () -> Unit,
@@ -96,7 +97,7 @@ fun HomePreview(
 
             Spacer(Modifier.weight(1f))
 
-            HingeReadout(hingeAngle, paneTilt, simulated)
+            HingeReadout(hingeAngle, paneTilt, simulated, batterySaverReduced)
 
             Spacer(Modifier.height(28.dp))
 
@@ -159,8 +160,14 @@ private fun Clock() {
 }
 
 @Composable
-private fun HingeReadout(hingeAngle: Float, paneTilt: Float, simulated: Boolean) {
+private fun HingeReadout(
+    hingeAngle: Float,
+    paneTilt: Float,
+    simulated: Boolean,
+    batterySaverReduced: Boolean,
+) {
     val hint = when {
+        batterySaverReduced -> "Battery Saver on — effect reduced"
         simulated -> "Simulated hinge — tune ▸ drag the slider"
         hingeAngle.isNaN() -> "Waiting for hinge sensor…"
         paneTilt < 0.05f -> "Fold the phone partway, then open it"

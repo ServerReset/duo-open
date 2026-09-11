@@ -27,13 +27,17 @@ wallpaper mode if you'd rather not enable an accessibility service.
 
 ## Install
 
-1. Download `DuoOpen-<version>.apk` from
-   [Releases](../../releases) and install it.
-2. Open **Duo Open** → **Tune** → **Turn on in Accessibility** → enable
-   *Duo Open full-screen fold*.
+1. Download `DuoOpen-<version>-release.apk` from
+   [Releases](../../releases) and install it. (The Actions artifact is a zip;
+   use the Releases page for a directly installable `.apk`.)
+   - This fork uses the app id `com.duoopen.live` and its own signing key, so
+     it installs **alongside** the original Duo Open instead of failing with
+     "App not installed". Uninstalling the original is optional.
+2. Open **Duo Open Live** → **Tune** → **Turn on in Accessibility** → enable
+   *Duo Open Live full-screen fold*.
    - Android 13+ blocks accessibility for sideloaded apps until you allow
-     it: if the toggle is greyed out, go to *Settings → Apps → Duo Open → ⋮
-     (top right) → Allow restricted settings*, then try again.
+     it: if the toggle is greyed out, go to *Settings → Apps → Duo Open Live →
+     ⋮ (top right) → Allow restricted settings*, then try again.
 3. Fold the phone partway and open it. **Tune → Test it now** replays the
    effect without folding.
 
@@ -51,6 +55,22 @@ phase starts and keeps it in memory only while the overlay is on screen.
 Nothing is stored, logged or sent anywhere; the app has no network
 permission. Screens the system marks secure (banking apps, DRM video) can't
 be captured and the effect simply doesn't play there.
+
+## Battery
+
+The effect is built to cost nothing when the phone isn't folding:
+
+- The hinge sensor is on-change, so it's silent at rest. The in-app preview
+  stops listening when it isn't in front, and the accessibility service stops
+  the sensor while the screen is off.
+- The overlay only renders while a fold is actually happening and idles the
+  moment it settles.
+
+It also respects Android's Battery Saver (Samsung Power Saving). When the
+system turns it on, the app stands the full-screen fold down, drops the sensor
+to ~15 Hz, and eases the wallpaper with fewer frames. There's a **Reduce in
+Battery Saver** switch in Tune (on by default); turn it off to keep the full
+effect regardless of power state.
 
 ## Known limits
 
@@ -73,9 +93,9 @@ Release signing reads `keystore.properties` in the project root
 release build uses the debug key.
 
 Handy adb bits: enable the service with
-`adb shell settings put secure enabled_accessibility_services com.duoopen/com.duoopen.overlay.FoldOverlayService`,
+`adb shell settings put secure enabled_accessibility_services com.duoopen.live/com.duoopen.overlay.FoldOverlayService`,
 replay the effect with `adb shell am broadcast -a com.duoopen.DEMO`,
-watch it with `adb logcat -s DuoOverlay`.
+watch it with `adb logcat -s DuoOverlay` (sensor logs are under `DuoHinge`).
 
 ## Layout
 

@@ -24,6 +24,7 @@ import com.duoopen.fold.DuoShader
 import com.duoopen.fold.HingeAngleSource
 import com.duoopen.fold.TiltFollower
 import com.duoopen.fold.isInnerPanel
+import com.duoopen.power.PowerState
 import com.duoopen.settings.DuoSettings
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.MainScope
@@ -109,6 +110,7 @@ class FoldOverlayService : AccessibilityService() {
         displayManager.registerDisplayListener(displayListener, handler)
         hinge = HingeAngleSource(this) { onHinge(it) }
         hinge.start()
+        observePower()
         innerPanel = defaultDisplay().isInnerPanel()
         Log.i(TAG, "connected; hinge=${hinge.sensor?.name} inner=$innerPanel")
     }
@@ -128,11 +130,38 @@ class FoldOverlayService : AccessibilityService() {
 
     private fun defaultDisplay(): Display? = displayManager.getDisplay(Display.DEFAULT_DISPLAY)
 
+    /**
+     * Battery behavior: stop the sensor while the screen is off, and when
+     * Battery Saver kicks in, drop to a slow sample rate and tear down any
+     * overlay (the capture + full-screen render is the expensive part).
+     */
+    private fun observePower() {
+        scope.launch {
+            PowerState.screenOn.collect { on -> if (on) hinge.start() else hinge.stop() }
+        }
+        scope.launch { PowerState.batterySaver.collect { applyPowerSave() } }
+        scope.launch { DuoSettings.config.collect { applyPowerSave() } }
+    }
+
+    private fun applyPowerSave() {
+        val reduce = DuoSettings.config.value.powerSaveReducesEffect
+        val saving = PowerState.batterySaver.value
+        hinge.setPowerSave(reduce && saving)
+        if (reduce && saving && phase != Phase.IDLE) {
+            Log.i(TAG, "battery saver on; standing the effect down")
+            removeOverlay()
+        }
+    }
+
+    private fun effectSuppressed(): Boolean =
+        DuoSettings.config.value.powerSaveReducesEffect && PowerState.batterySaver.value
+
     private fun currentTilt(): Float =
         DuoShader.tiltFor(hinge.lastAngle, DuoSettings.config.value, innerPanel)
 
     private fun onHinge(angle: Float) {
         lastHingeMoveMs = SystemClock.uptimeMillis()
+        if (!demoRunning && effectSuppressed()) return
         evaluate()
         val tilt = DuoShader.tiltFor(angle, DuoSettings.config.value, innerPanel)
         if (timedResolve) return
@@ -153,6 +182,7 @@ class FoldOverlayService : AccessibilityService() {
      */
     private fun evaluate() {
         if (demoRunning) return
+        if (effectSuppressed()) return
         val inner = defaultDisplay().isInnerPanel()
         if (inner != innerPanel) {
             innerPanel = inner

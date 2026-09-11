@@ -43,19 +43,38 @@ class HingeAngleSource(
 
     private val filter = AngleFilter()
     private var started = false
+    private var powerSave = false
 
     fun start() {
-        val s = sensor ?: return
         if (started) return
         started = true
+        register()
+    }
+
+    /**
+     * Re-registers at a much lower rate while the system is in Battery Saver,
+     * so the wallpaper still tracks a fold without the high-rate wakeups.
+     */
+    fun setPowerSave(enabled: Boolean) {
+        if (powerSave == enabled) return
+        powerSave = enabled
+        if (!started) return
+        sensorManager?.unregisterListener(this)
+        register()
+    }
+
+    private fun register() {
+        val s = sensor ?: return
         filter.reset()
-        val periodUs = if (s.minDelay > FAST_PERIOD_US) s.minDelay else FAST_PERIOD_US
+        val target = if (powerSave) SLOW_PERIOD_US else FAST_PERIOD_US
+        val periodUs = if (s.minDelay > target) s.minDelay else target
         val registered = sensorManager?.registerListener(this, s, periodUs) == true ||
             sensorManager?.registerListener(this, s, SensorManager.SENSOR_DELAY_GAME) == true
         Log.i(
             TAG,
             "hinge sensor=${s.name} type=${s.stringType} " +
-                "wakeUp=${s.isWakeUpSensor} minDelay=${s.minDelay}us period=${periodUs}us registered=$registered",
+                "wakeUp=${s.isWakeUpSensor} minDelay=${s.minDelay}us period=${periodUs}us " +
+                "powerSave=$powerSave registered=$registered",
         )
     }
 
@@ -97,5 +116,7 @@ class HingeAngleSource(
         const val TAG = "DuoHinge"
         /** ~125 Hz ceiling; the sensor only reports on change anyway. */
         const val FAST_PERIOD_US = 8_000
+        /** ~15 Hz under Battery Saver: plenty to follow a fold, far fewer wakeups. */
+        const val SLOW_PERIOD_US = 66_000
     }
 }

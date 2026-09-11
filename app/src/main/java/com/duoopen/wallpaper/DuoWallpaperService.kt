@@ -15,6 +15,7 @@ import com.duoopen.fold.HingeAngleSource
 import com.duoopen.fold.TiltFollower
 import com.duoopen.fold.isInnerPanel
 import com.duoopen.overlay.OverlayState
+import com.duoopen.power.PowerState
 import com.duoopen.settings.DuoConfig
 import com.duoopen.settings.DuoSettings
 import kotlinx.coroutines.Dispatchers
@@ -69,9 +70,11 @@ class DuoWallpaperService : WallpaperService() {
                     config = c
                     if (c.imageVersion != bitmapVersion) loadImage(c.imageVersion)
                     follower.snap(tiltFor(hinge.lastAngle))
+                    applyPowerSave()
                     draw()
                 }
             }
+            scope.launch { PowerState.batterySaver.collect { applyPowerSave() } }
             scope.launch { OverlayState.running.collect { draw() } }
         }
 
@@ -113,6 +116,13 @@ class DuoWallpaperService : WallpaperService() {
         private fun onHingeAngle(angle: Float) {
             val tilt = tiltFor(angle)
             if (isInner() && isVisible && surfaceReady) follower.setTarget(tilt) else follower.snap(tilt)
+        }
+
+        /** Battery Saver: sample slowly and ease longer so we draw fewer frames. */
+        private fun applyPowerSave() {
+            val saving = PowerState.batterySaver.value && config.powerSaveReducesEffect
+            hinge.setPowerSave(saving)
+            follower.tauS = if (saving) POWER_SAVE_TAU_S else TiltFollower.DEFAULT_TAU_S
         }
 
         private fun tiltFor(angle: Float): Float =
@@ -177,5 +187,7 @@ class DuoWallpaperService : WallpaperService() {
 
     private companion object {
         const val TAG = "DuoWallpaper"
+        /** Slower ease under Battery Saver: fewer frame callbacks per fold. */
+        const val POWER_SAVE_TAU_S = 0.12f
     }
 }

@@ -4,4 +4,4 @@
     android:accessibilityFeedbackType="feedbackGeneric"
     android:canTakeScreenshot="true"
     android:notificationTimeout="1000"
-    android:settingsActivity="com.duoopen.MainActivity" />
+    android:settingsActivity="com.duoopen.live/com.duoopen.MainActivity" />

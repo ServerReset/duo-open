@@ -188,6 +188,22 @@ fun ControlSheet(
             }
             TextButton(onClick = DuoSettings::resetTuning) { Text("Reset tuning") }
 
+            Spacer(Modifier.height(4.dp))
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Column(Modifier.weight(1f)) {
+                    Text("Reduce in Battery Saver", style = MaterialTheme.typography.titleSmall)
+                    Text(
+                        "Lets Android turn the full-screen fold off and slows the sensor while saving power.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+                Switch(
+                    checked = config.powerSaveReducesEffect,
+                    onCheckedChange = { v -> DuoSettings.update { it.copy(powerSaveReducesEffect = v) } },
+                )
+            }
+
             HorizontalDivider(Modifier.padding(vertical = 12.dp))
 
             Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
