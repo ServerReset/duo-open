@@ -74,8 +74,8 @@ class TiltFollower(private val onFrame: (tilt: Float) -> Unit) : Choreographer.F
          * animates across the gap instead of jumping.
          */
         fun tauForGap(gapMs: Float): Float {
-            val gap = if (gapMs > 0f) gapMs else 250f
-            return (gap / 1000f / 2.2f).coerceIn(0.02f, 0.3f)
+            val gap = if (gapMs > 0f) gapMs else 200f
+            return (gap / 1000f / 3f).coerceIn(0.03f, 0.18f)
         }
     }
 }

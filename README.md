@@ -141,17 +141,18 @@ settings/DuoSettings.kt                   shared tuning (SharedPreferences + Sta
 ## Galaxy Z Fold notes
 
 - Samsung exposes the hinge through the platform `TYPE_HINGE_ANGLE` sensor
-  (usually alongside a wake-up variant). The app picks the continuous one
-  first, then a wake-up/vendor one, and reads it at full rate. The **main
-  screen** shows a live sensor line (`name · Hz · raw · age`) so you can see at
-  a glance whether readings are arriving.
-- Some hinges only emit a reading or two per fold rather than a stream. The
-  overlay and wallpaper ease lightly across active movement, while the in-app
-  preview tracks the value one-to-one so its readout and effect stay in lockstep.
-  Idle pauses are ignored so the easing never stretches out after the phone has
-  been sitting still.
-- The sensor is left registered and untouched — re-registering it to "poll"
-  resets some hinges' change detector and starves the feed.
+  (usually alongside a wake-up variant). The app registers all of them and uses
+  whichever actually streams the widest range of angles. The **main screen**
+  shows the live sensor line (`name · Hz · raw · age · range`).
+- Samsung's hinge sensor reports **posture angles only** — 0° closed, 90° flex,
+  180° open — not a continuous angle. So the value used for both the readout
+  and the effect is eased between readings (over the measured spacing, with
+  idle pauses excluded), which animates like the simulator instead of jumping
+  between three stops.
+- Every hinge sensor the device exposes is registered and scored (reading
+  count and angle range); the best one is used. The listener is left registered
+  and untouched — re-registering it to "poll" resets some hinges' change
+  detector and starves the feed.
 - The main screen also has the **Simulate hinge** switch and slider, so you can
   play the effect and watch it in real time without folding (handy when the
   Accessibility service isn't enabled yet).

@@ -170,9 +170,12 @@ class HingeAngleSource(
 
         if (lastEventUptime != 0L) {
             val gap = (now - lastEventUptime).toFloat()
-            // Only fold-active spacings count; idle pauses must not stretch it.
-            if (gap <= ACTIVE_GAP_MS) {
-                eventGapMs = if (eventGapMs <= 0f) gap else eventGapMs * 0.7f + gap * 0.3f
+            eventGapMs = when {
+                // A real idle pause: forget it, so the next move starts fresh
+                // instead of easing for a second.
+                gap > ACTIVE_GAP_MS -> 0f
+                eventGapMs <= 0f -> gap
+                else -> eventGapMs * 0.7f + gap * 0.3f
             }
         }
         lastEventUptime = now
@@ -215,6 +218,6 @@ class HingeAngleSource(
         /** ~15 Hz under Battery Saver: plenty to follow a fold, far fewer wakeups. */
         const val SLOW_PERIOD_US = 66_000
         /** Spacings above this are idle pauses, not fold motion. */
-        const val ACTIVE_GAP_MS = 400f
+        const val ACTIVE_GAP_MS = 1_200f
     }
 }

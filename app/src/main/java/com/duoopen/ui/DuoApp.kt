@@ -10,6 +10,8 @@ import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
@@ -72,9 +74,19 @@ fun DuoApp(foldLineFlow: StateFlow<FoldLine?>) {
     // Re-read the panel on every configuration change (the fold swaps panels).
     LocalConfiguration.current
     val onCover = !simulate && hinge.sensor != null && !context.display.isInnerPanel()
-    val targetTilt = if (angle.isNaN() || onCover) 0f else DuoShader.tiltForHinge(angle, config)
-    // One-to-one with the sensor. The readout and the effect have to move
-    // together; any tween here makes the visual lag the numbers.
+    // Samsung's hinge sensor reports only posture angles (0 / 90 / 180), so ease
+    // between readings to animate the way the simulator does. The ease length
+    // follows how far apart readings arrive, and idle pauses are excluded, so it
+    // stays short during real movement.
+    val gapMs = if (hinge.eventGapMs > 0f) hinge.eventGapMs else 120f
+    val easeMs = (gapMs * 0.6f).coerceIn(60f, 220f).toInt()
+    val smoothAngle by animateFloatAsState(
+        targetValue = if (angle.isNaN()) 0f else angle,
+        animationSpec = tween(durationMillis = easeMs),
+        label = "hingeAngle",
+    )
+    val shownAngle = if (angle.isNaN()) Float.NaN else smoothAngle
+    val targetTilt = if (shownAngle.isNaN() || onCover) 0f else DuoShader.tiltForHinge(shownAngle, config)
     val paneTilt = targetTilt
 
     val shader = remember { DuoShader.create(context) }
@@ -114,7 +126,7 @@ fun DuoApp(foldLineFlow: StateFlow<FoldLine?>) {
     Box(Modifier.fillMaxSize().background(Color.Black)) {
         HomePreview(
             image = image,
-            hingeAngle = angle,
+            hingeAngle = shownAngle,
             paneTilt = paneTilt,
             simulate = simulate,
             sensorPresent = hinge.sensor != null,
@@ -144,7 +156,7 @@ fun DuoApp(foldLineFlow: StateFlow<FoldLine?>) {
                 sensorName = hinge.sensors.takeIf { it.isNotEmpty() }?.joinToString("\n") {
                     "${it.name} (${if (it.isWakeUpSensor) "wake-up" else "continuous"})"
                 },
-                hingeAngle = angle,
+                hingeAngle = shownAngle,
                 paneTilt = paneTilt,
                 onPickImage = {
                     pickImage.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly))
