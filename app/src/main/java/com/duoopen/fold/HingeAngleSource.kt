@@ -96,6 +96,9 @@ class HingeAngleSource(
         onAngle(angle)
     }
 
+    /** True while the gyro is actively driving the estimate (real motion). */
+    val gyroActive: Boolean get() = estimator.motionActive
+
     fun lastEventAgeMs(): Long =
         if (lastEventUptime == 0L) Long.MAX_VALUE else SystemClock.uptimeMillis() - lastEventUptime
 

@@ -69,6 +69,8 @@ class FoldOverlayService : AccessibilityService() {
     private var lastHingeMoveMs = 0L
     /** Throttle for evaluate() so sensor-rate events don't hammer display state. */
     private var lastEvaluateMs = 0L
+    /** When the current overlay started showing, for the max-show safety. */
+    private var shownSinceMs = 0L
     private var demoRunning = false
     /** Bumped per capture so a late or hung screenshot can't act on a newer phase. */
     private var captureGen = 0
@@ -87,7 +89,10 @@ class FoldOverlayService : AccessibilityService() {
         override fun run() {
             val o = overlay ?: return
             if (o.tilt < DuoShader.FLAT_EPSILON) return
-            if (!demoRunning && SystemClock.uptimeMillis() - lastHingeMoveMs >= SETTLE_TIMEOUT_MS) {
+            val now = SystemClock.uptimeMillis()
+            if (!demoRunning &&
+                (now - lastHingeMoveMs >= SETTLE_TIMEOUT_MS || now - shownSinceMs >= MAX_SHOW_MS)
+            ) {
                 dismiss(fadeMs = FADE_OUT_STALLED_MS)
             } else {
                 handler.postDelayed(this, 150)
@@ -162,9 +167,18 @@ class FoldOverlayService : AccessibilityService() {
         DuoShader.tiltFor(hinge.lastAngle, DuoSettings.config.value, innerPanel)
 
     private fun onHinge(angle: Float) {
+        if (!demoRunning && effectSuppressed()) return
+        // Never show the fold while the phone is essentially flat (>=175°), and
+        // never while the raw sensor sits at the open endpoint with no gyro
+        // motion — that is a stuck/false reading, not a fold.
+        if (angle > TRIGGER_HINGE || (hinge.rawAngle >= 179f && !hinge.gyroActive)) {
+            restArmed = true
+            panelSwitched = false
+            if (phase == Phase.SHOWING) dismiss(fadeMs = FADE_OUT_FLAT_MS)
+            return
+        }
         val now = SystemClock.uptimeMillis()
         lastHingeMoveMs = now
-        if (!demoRunning && effectSuppressed()) return
         // evaluate() hits the display state; throttle it. The follower below is
         // what tracks the angle at sensor rate.
         if (now - lastEvaluateMs >= EVALUATE_MIN_INTERVAL_MS) {
@@ -200,6 +214,13 @@ class FoldOverlayService : AccessibilityService() {
         }
         val angle = hinge.lastAngle
         if (angle.isNaN()) return
+        // Same flat/stuck guard as onHinge: no capture while >=175° or while the
+        // raw sensor sits at the open endpoint with no gyro motion.
+        if (angle > TRIGGER_HINGE || (hinge.rawAngle >= 179f && !hinge.gyroActive)) {
+            restArmed = true
+            panelSwitched = false
+            return
+        }
         val tilt = DuoShader.tiltFor(angle, DuoSettings.config.value, inner)
         if (tilt < DuoShader.FLAT_EPSILON) {
             restArmed = true
@@ -381,6 +402,7 @@ class FoldOverlayService : AccessibilityService() {
         }
         overlay = view
         phase = Phase.SHOWING
+        shownSinceMs = SystemClock.uptimeMillis()
         OverlayState.setRunning(true)
         if (fadeIn) {
             // Content was already live on this panel; ease the frost in.
@@ -493,6 +515,10 @@ class FoldOverlayService : AccessibilityService() {
         private const val SKIP_COVER_BELOW_HINGE = 10f
         private const val SETTLE_TIMEOUT_MS = 700L
         private const val EVALUATE_MIN_INTERVAL_MS = 50L
+        /** Don't start/show the effect while the phone is essentially flat. */
+        private const val TRIGGER_HINGE = 175f
+        /** Hard cap on a single overlay showing, so it can never stay stuck. */
+        private const val MAX_SHOW_MS = 3_000L
         private const val FADE_IN_MS = 140L
         private const val FADE_OUT_FLAT_MS = 120L
         private const val FADE_OUT_STALLED_MS = 300L
