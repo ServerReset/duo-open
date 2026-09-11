@@ -9,20 +9,25 @@ import kotlin.math.abs
  *
  * The public hinge sensor on several Samsung foldables reports only 0 / 90 /
  * 180, so the gyroscope's rotation about the fold axis (device Y) is integrated
- * between those anchors to drive the visual smoothly. This is a *relative
- * estimate*, not a measured angle: moving the whole device can contaminate it,
- * so it only starts from a rested endpoint, is re-anchored by every hinge
- * reading, and settles shortly after motion stops.
+ * between those anchors. This is a *relative* estimate, not a measured angle.
+ *
+ * It is deliberately bounded so it can never peg the CPU/GPU: it only runs
+ * between a fold onset and a short quiet period, has a hard active cap, and
+ * only emits when the value materially changes. A low "still" threshold would
+ * let hand tremor keep it emitting at sensor rate forever, which janks the
+ * device.
  */
 class FoldMotionEstimator(private val onAngle: (Float) -> Unit) {
 
     private var anchor = Float.NaN
     private var estimated = Float.NaN
+    private var lastEmitted = Float.NaN
     private var direction = 0          // +1 opening, -1 closing, 0 idle
     private var active = false
     private var lastGyroNs = 0L
     private var onsetSince = 0L
     private var lastMotionMs = 0L
+    private var activeSinceMs = 0L
 
     fun onHinge(angle: Float, now: Long) {
         if (!angle.isFinite()) return
@@ -43,18 +48,19 @@ class FoldMotionEstimator(private val onAngle: (Float) -> Unit) {
                 onsetSince = 0L
             }
             else -> {
-                // Mid stop (typically 90°): infer the direction from where we
-                // came, go active so the gyro keeps interpolating to the
-                // endpoint, and pull the estimate toward the stop.
+                // Mid stop (typically 90°): infer direction, go active so the
+                // gyro interpolates to the endpoint, and pull toward the stop.
                 if (previous.isFinite() && previous != angle) {
                     direction = if (angle > previous) 1 else -1
+                    if (!active) activeSinceMs = now
                     active = true
                     lastMotionMs = now
+                    onsetSince = 0L
                 }
                 estimated = (estimated + (angle - estimated) * 0.5f).coerceIn(0f, 180f)
             }
         }
-        emit(estimated)
+        emit(estimated, force = true)
     }
 
     fun onGyro(omegaY: Float, timestampNs: Long, now: Long) {
@@ -72,9 +78,11 @@ class FoldMotionEstimator(private val onAngle: (Float) -> Unit) {
                 if (onsetSince == 0L) onsetSince = now
                 if (now - onsetSince >= ONSET_HOLD_MS) {
                     active = true
+                    activeSinceMs = now
                     direction = if (anchor <= END_LO) 1 else -1
                     estimated = if (anchor <= END_LO) 0f else 180f
                     lastMotionMs = now
+                    emit(estimated, force = true)
                 }
             } else {
                 onsetSince = 0L
@@ -87,29 +95,34 @@ class FoldMotionEstimator(private val onAngle: (Float) -> Unit) {
             lastMotionMs = now
             emit(estimated)
         }
-        if (now - lastMotionMs > SETTLE_MS) {
+        // Settle on a real quiet gap, and never stay active beyond the cap.
+        if (now - lastMotionMs > SETTLE_MS || now - activeSinceMs > MAX_ACTIVE_MS) {
             active = false
             direction = 0
             onsetSince = 0L
-            emit(estimated)
         }
     }
 
     fun reset() {
         anchor = Float.NaN
         estimated = Float.NaN
+        lastEmitted = Float.NaN
         direction = 0
         active = false
         lastGyroNs = 0L
         onsetSince = 0L
         lastMotionMs = 0L
+        activeSinceMs = 0L
     }
 
     /** True while the gyro is actively driving the estimate. */
     val motionActive: Boolean get() = active
 
-    private fun emit(angle: Float) {
-        if (angle.isFinite()) onAngle(angle)
+    private fun emit(angle: Float, force: Boolean = false) {
+        if (!angle.isFinite()) return
+        if (!force && lastEmitted.isFinite() && abs(angle - lastEmitted) < EMIT_DEADBAND) return
+        lastEmitted = angle
+        onAngle(angle)
     }
 
     private companion object {
@@ -118,8 +131,13 @@ class FoldMotionEstimator(private val onAngle: (Float) -> Unit) {
         /** Sustained angular speed (rad/s) that starts a fold from rest. */
         const val ONSET_RATE = 0.15f
         const val ONSET_HOLD_MS = 200L
-        const val STILL_RATE = 0.05f
-        const val SETTLE_MS = 700L
+        /** Below this the phone counts as still (noise/tremor is ignored). */
+        const val STILL_RATE = 0.18f
+        const val SETTLE_MS = 400L
+        /** Hard cap so a noisy sensor can never keep the effect running. */
+        const val MAX_ACTIVE_MS = 5_000L
         const val RESPONSE = 1.0f
+        /** Only report a new angle once it has moved this much. */
+        const val EMIT_DEADBAND = 0.25f
     }
 }

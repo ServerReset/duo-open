@@ -180,9 +180,10 @@ class HingeAngleSource(
             )
         }
         // Gyroscope: integrated between coarse hinge stops to smooth the effect.
+        // ~30 Hz keeps the render load sane (the shader re-renders per change).
         gyro?.let { g ->
             val ok = try {
-                sm.registerListener(this, g, 20_000)
+                sm.registerListener(this, g, 30_000)
             } catch (e: SecurityException) {
                 false
             }

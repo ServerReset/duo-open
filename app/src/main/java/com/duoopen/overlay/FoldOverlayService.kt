@@ -67,6 +67,8 @@ class FoldOverlayService : AccessibilityService() {
     private var restArmed = true
     private var panelSwitched = false
     private var lastHingeMoveMs = 0L
+    /** Throttle for evaluate() so sensor-rate events don't hammer display state. */
+    private var lastEvaluateMs = 0L
     private var demoRunning = false
     /** Bumped per capture so a late or hung screenshot can't act on a newer phase. */
     private var captureGen = 0
@@ -160,9 +162,15 @@ class FoldOverlayService : AccessibilityService() {
         DuoShader.tiltFor(hinge.lastAngle, DuoSettings.config.value, innerPanel)
 
     private fun onHinge(angle: Float) {
-        lastHingeMoveMs = SystemClock.uptimeMillis()
+        val now = SystemClock.uptimeMillis()
+        lastHingeMoveMs = now
         if (!demoRunning && effectSuppressed()) return
-        evaluate()
+        // evaluate() hits the display state; throttle it. The follower below is
+        // what tracks the angle at sensor rate.
+        if (now - lastEvaluateMs >= EVALUATE_MIN_INTERVAL_MS) {
+            lastEvaluateMs = now
+            evaluate()
+        }
         val tilt = DuoShader.tiltFor(angle, DuoSettings.config.value, innerPanel)
         if (timedResolve) return
         if (tilt < DuoShader.FLAT_EPSILON && phase == Phase.SHOWING && !demoRunning) {
@@ -484,6 +492,7 @@ class FoldOverlayService : AccessibilityService() {
         private const val SKIP_INNER_ABOVE_HINGE = 135f
         private const val SKIP_COVER_BELOW_HINGE = 10f
         private const val SETTLE_TIMEOUT_MS = 700L
+        private const val EVALUATE_MIN_INTERVAL_MS = 50L
         private const val FADE_IN_MS = 140L
         private const val FADE_OUT_FLAT_MS = 120L
         private const val FADE_OUT_STALLED_MS = 300L
