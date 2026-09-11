@@ -85,7 +85,8 @@ class FoldMotionEstimator(private val onAngle: (Float) -> Unit) {
 
         if (!active) {
             // Tentative start only from a rested endpoint, after sustained
-            // rotation. Cancelled below unless a hinge change confirms it.
+            // rotation. It produces no output at all until a hinge change
+            // confirms it, so tilting the phone can never move the effect.
             if ((anchor <= END_LO || anchor >= END_HI) && rate > ONSET_RATE) {
                 if (onsetSince == 0L) onsetSince = now
                 if (now - onsetSince >= ONSET_HOLD_MS) {
@@ -96,7 +97,6 @@ class FoldMotionEstimator(private val onAngle: (Float) -> Unit) {
                     direction = if (anchor <= END_LO) 1 else -1
                     estimated = if (anchor <= END_LO) 0f else 180f
                     lastMotionMs = now
-                    emit(estimated, force = true)
                 }
             } else {
                 onsetSince = 0L
@@ -107,7 +107,8 @@ class FoldMotionEstimator(private val onAngle: (Float) -> Unit) {
         if (rate >= STILL_RATE) {
             estimated = (estimated + direction * deltaDeg * RESPONSE).coerceIn(0f, 180f)
             lastMotionMs = now
-            emit(estimated)
+            // Silent while tentative: only a hinge-confirmed fold is reported.
+            if (confirmed) emit(estimated)
         }
 
         val now2 = now
