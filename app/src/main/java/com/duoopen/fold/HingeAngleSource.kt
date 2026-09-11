@@ -114,8 +114,8 @@ class HingeAngleSource(
 
     private companion object {
         const val TAG = "DuoHinge"
-        /** ~125 Hz ceiling; the sensor only reports on change anyway. */
-        const val FAST_PERIOD_US = 8_000
+        /** ~50 Hz is plenty for a hand-driven fold and far lighter than 125 Hz. */
+        const val FAST_PERIOD_US = 20_000
         /** ~15 Hz under Battery Saver: plenty to follow a fold, far fewer wakeups. */
         const val SLOW_PERIOD_US = 66_000
     }

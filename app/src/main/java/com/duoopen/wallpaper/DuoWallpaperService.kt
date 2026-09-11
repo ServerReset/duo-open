@@ -75,6 +75,8 @@ class DuoWallpaperService : WallpaperService() {
                 }
             }
             scope.launch { PowerState.batterySaver.collect { applyPowerSave() } }
+            // No point holding the sensor while the display is off.
+            scope.launch { PowerState.screenOn.collect { on -> if (on) hinge.start() else hinge.stop() } }
             scope.launch { OverlayState.running.collect { draw() } }
         }
 

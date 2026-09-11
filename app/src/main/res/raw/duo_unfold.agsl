@@ -36,6 +36,7 @@ uniform float axisSwap;
 uniform float paneSide;
 uniform float blurSpread;
 uniform float darkening;
+uniform float liftShade;
 
 const float GOLDEN_ANGLE = 2.39996322972865332; // radians, Vogel disk spacing
 const float TWO_PI = 6.28318530717958648;
@@ -58,6 +59,13 @@ half4 main(float2 fragCoord) {
         return content.eval(fragCoord); // the half held still stays flat
     }
     float d = abs(p.x - hingePos);                     // distance from hinge along the glass
+
+    // Matte lift shading: with the frost turned down the raised half is clear
+    // glass, so a soft contact shadow near the crease (plus a touch of overall
+    // dimming) is what sells it as the phone peeling off the flat sheet.
+    float lift = sin(tilt);
+    float crease = exp(-d / max(0.18 * size.x, 1.0));
+    float shade = max(1.0 - liftShade * lift * (0.85 * crease + 0.15), 0.0);
 
     // Glass rotated `tilt` around the hinge line, outer edge rising toward the viewer.
     float2 glass = float2(hingePos + side * d * cos(tilt), p.y);
@@ -85,7 +93,7 @@ half4 main(float2 fragCoord) {
     float atten = max(1.0 - darkening * radius, 0.0);
 
     if (radius < 0.5) {
-        return half4(content.eval(hit).rgb * half(atten), 1.0);
+        return half4(content.eval(hit).rgb * half(atten * shade), 1.0);
     }
 
     // Vogel disk with per-pixel rotation (banding becomes frosted-glass grain).
@@ -104,5 +112,5 @@ half4 main(float2 fragCoord) {
         wsum += w;
     }
     half3 avg = sum / half(max(wsum, 1.0));
-    return half4(avg * half(atten), 1.0);
+    return half4(avg * half(atten * shade), 1.0);
 }

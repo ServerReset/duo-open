@@ -27,8 +27,15 @@ import kotlinx.coroutines.flow.asStateFlow
  */
 data class DuoConfig(
     val intensity: Float = 1f,
-    val blurSpread: Float = 0.12f,
-    val darkening: Float = 0.015f,
+    /**
+     * Frosted-glass look. 0 = a clear "flat sheet" (the default): the moving
+     * half shows the same image, foreshortened, as if the phone is peeling off
+     * a fixed sheet of paper. Raise it for the original frosted pane.
+     */
+    val blurSpread: Float = 0f,
+    val darkening: Float = 0f,
+    /** Matte contact shadow near the crease that sells the lift. */
+    val liftShade: Float = 0.4f,
     val eyeDistanceMm: Float = 450f,
     val foldSplitsLong: Boolean = false,
     val movingSide: Int = -1,
@@ -52,6 +59,7 @@ object DuoSettings {
             intensity = prefs.getFloat("intensity", d.intensity),
             blurSpread = prefs.getFloat("blurSpread", d.blurSpread),
             darkening = prefs.getFloat("darkening", d.darkening),
+            liftShade = prefs.getFloat("liftShade", d.liftShade),
             eyeDistanceMm = prefs.getFloat("eyeDistanceMm", d.eyeDistanceMm),
             foldSplitsLong = prefs.getBoolean("foldSplitsLong", d.foldSplitsLong),
             movingSide = prefs.getInt("movingSide", d.movingSide),
@@ -69,6 +77,7 @@ object DuoSettings {
             putFloat("intensity", next.intensity)
             putFloat("blurSpread", next.blurSpread)
             putFloat("darkening", next.darkening)
+            putFloat("liftShade", next.liftShade)
             putFloat("eyeDistanceMm", next.eyeDistanceMm)
             putBoolean("foldSplitsLong", next.foldSplitsLong)
             putInt("movingSide", next.movingSide)

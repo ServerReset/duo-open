@@ -12,12 +12,16 @@ Based on the AGSL shader from
 
 ## What it does
 
-Each half of the screen acts as a pane of frosted glass hinged at the crease.
-While the phone is partly folded the moving half is blurred and darkened by
-how far it is from flat; as the hinge reaches 180° the picture settles into
-focus. Both panels take part: the cover screen frosts in over the first ~20°
-of an open, then the inner screen picks up frosted and clears. Closing plays
-it in reverse.
+The picture behaves like a flat sheet of paper fixed in space. As you open the
+phone the content stays put; the moving half of the display is seen as a clear
+window onto that sheet, so it reads as if the phone is peeling up off the flat
+image and settling back onto it. A soft contact shadow at the crease sells the
+lift. Both panels take part: the cover screen leads over the first ~20° of an
+open, then the inner panel picks up and resolves.
+
+Prefer the original look? The **Tune** sheet's **Frost** slider brings back the
+frosted-glass pane (and **Darkening** its falloff); at 0 frost the moving half
+stays clear, which is the default.
 
 It works over *everything* — your own wallpaper, icons, widgets, the lock
 screen, whatever app is open — because it runs as an accessibility service
@@ -41,9 +45,9 @@ wallpaper mode if you'd rather not enable an accessibility service.
 3. Fold the phone partway and open it. **Tune → Test it now** replays the
    effect without folding.
 
-The **Tune** sheet has strength, frost, darkening, eye distance, which half
-moves (left/right/both), which edge the cover-screen frost comes from, and
-a hinge simulator.
+The **Tune** sheet has strength, lift, frost, darkening, eye distance, which
+half moves (left/right/both), which edge the cover-screen frost comes from,
+and a hinge simulator.
 
 Wallpaper-only mode: **Set live wallpaper** in the app (home + lock screen).
 Only the wallpaper folds in that mode; icons stay sharp.
@@ -60,11 +64,12 @@ be captured and the effect simply doesn't play there.
 
 The effect is built to cost nothing when the phone isn't folding:
 
-- The hinge sensor is on-change, so it's silent at rest. The in-app preview
-  stops listening when it isn't in front, and the accessibility service stops
-  the sensor while the screen is off.
+- The hinge sensor is on-change at ~50 Hz, so it's silent at rest. The in-app
+  preview stops listening when it isn't in front; the accessibility service and
+  the live wallpaper both stop the sensor while the screen is off.
 - The overlay only renders while a fold is actually happening and idles the
-  moment it settles.
+  moment it settles. With the default clear look it's a single texture sample
+  per pixel at native resolution — no blur passes, no half-res upscale.
 
 It also respects Android's Battery Saver (Samsung Power Saving). When the
 system turns it on, the app stands the full-screen fold down, drops the sensor
@@ -100,7 +105,7 @@ watch it with `adb logcat -s DuoOverlay` (sensor logs are under `DuoHinge`).
 ## Layout
 
 ```
-app/src/main/res/raw/duo_unfold.agsl      fold shader (hinge line, moving side, eye)
+app/src/main/res/raw/duo_unfold.agsl      sheet shader (hinge, moving side, eye, lift shade)
 fold/DuoShader.kt                         uniforms, hinge→tilt mapping, fold placement
 fold/HingeAngleSource.kt                  TYPE_HINGE_ANGLE discovery + vendor fallback
 fold/AngleFilter.kt                       adaptive 1€ filter: live, jitter-free angle

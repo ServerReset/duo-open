@@ -128,6 +128,7 @@ object DuoShader {
         shader.setFloatUniform("axisSwap", if (fold.splitsX) 0f else 1f)
         shader.setFloatUniform("paneSide", (fold.movingSide ?: config.movingSide).toFloat())
         shader.setFloatUniform("blurSpread", config.blurSpread)
+        shader.setFloatUniform("liftShade", config.liftShade)
         // Blur radius is in device px; renormalize the per-px darkening from the
         // original's ~6 px/mm so dense panels don't crush to black.
         shader.setFloatUniform("darkening", config.darkening * REFERENCE_PX_PER_MM / pxPerMm)

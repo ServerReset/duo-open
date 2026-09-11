@@ -88,7 +88,7 @@ class FoldOverlayService : AccessibilityService() {
             if (!demoRunning && SystemClock.uptimeMillis() - lastHingeMoveMs >= SETTLE_TIMEOUT_MS) {
                 dismiss(fadeMs = FADE_OUT_STALLED_MS)
             } else {
-                handler.postDelayed(this, 100)
+                handler.postDelayed(this, 150)
             }
         }
     }
@@ -339,8 +339,17 @@ class FoldOverlayService : AccessibilityService() {
             .also { windowManager = it }
 
         val inner = innerPanel
-        val view = FoldOverlayView(this, bitmap, { w, h, c -> DuoShader.foldFor(inner, w, h, c) }).apply {
-            config = DuoSettings.config.value
+        val cfg = DuoSettings.config.value
+        // A clear "sheet" (no blur) is a single texture sample, so render it at
+        // full resolution; only the frosted look needs the half-res blur layer.
+        val renderScale = if (cfg.blurSpread < 0.01f) 1f else 2f
+        val view = FoldOverlayView(
+            this,
+            bitmap,
+            { w, h, c -> DuoShader.foldFor(inner, w, h, c) },
+            renderScale = renderScale,
+        ).apply {
+            config = cfg
             tilt = startTilt
         }
         val params = WindowManager.LayoutParams(
