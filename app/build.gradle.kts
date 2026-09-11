@@ -22,8 +22,8 @@ android {
         // AGSL RuntimeShader needs API 33 (OnePlus Open ships Android 13+).
         minSdk = 33
         targetSdk = 35
-        versionCode = 12
-        versionName = "1.7.4"
+        versionCode = 13
+        versionName = "1.7.5"
     }
 
     signingConfigs {
