@@ -21,7 +21,7 @@ data class FoldLine(
 /** Shared glue for res/raw/duo_unfold.agsl — used by the app, wallpaper and overlay. */
 object DuoShader {
     /** Pane tilt cap; beyond this the kernel is mostly black anyway. */
-    const val MAX_TILT = 45f
+    const val MAX_TILT = 55f
 
     /** Pane tilts below this draw the plain image (effect visually off). */
     const val FLAT_EPSILON = 0.05f
@@ -65,7 +65,10 @@ object DuoShader {
      * so the frost keeps resolving the whole way open. Intensity scales it.
      */
     fun tiltForHinge(hingeDegrees: Float, config: DuoConfig): Float {
-        val progress = ((FLAT_HINGE - hingeDegrees) / (FLAT_HINGE - PANEL_ON_HINGE)).coerceIn(0f, 1f)
+        val raw = ((FLAT_HINGE - hingeDegrees) / (FLAT_HINGE - PANEL_ON_HINGE)).coerceIn(0f, 1f)
+        // Smoothstep so the lift eases in and settles instead of moving at a
+        // constant rate — closer to how a hand actually opens a phone.
+        val progress = raw * raw * (3f - 2f * raw)
         val full = if (config.movingSide == 0) MAX_TILT * 0.6f else MAX_TILT
         return (progress * full * config.intensity).coerceIn(0f, MAX_TILT)
     }

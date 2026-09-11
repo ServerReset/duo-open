@@ -55,16 +55,20 @@ half4 main(float2 fragCoord) {
     float2 size = mix(resolution, resolution.yx, axisSwap);
 
     float side = mix(-1.0, 1.0, step(hingePos, p.x)); // -1 left pane, +1 right pane
-    if (paneSide * side < -0.5) {
-        return content.eval(fragCoord); // the half held still stays flat
-    }
     float d = abs(p.x - hingePos);                     // distance from hinge along the glass
 
-    // Matte lift shading: with the frost turned down the raised half is clear
-    // glass, so a soft contact shadow near the crease (plus a touch of overall
-    // dimming) is what sells it as the phone peeling off the flat sheet.
+    // Matte lift shading. The raised half is clear glass, so the cues that sell
+    // "phone peeling off a flat sheet" are the contact shadow near the crease on
+    // the moving half and the soft shadow it casts onto the half still down.
     float lift = sin(tilt);
-    float crease = exp(-d / max(0.18 * size.x, 1.0));
+    float crease = exp(-d / max(0.20 * size.x, 1.0));
+
+    if (paneSide * side < -0.5) {
+        // Half still lying on the plane: crisp, with the lifted half's shadow.
+        float stillShade = max(1.0 - liftShade * lift * 0.6 * crease, 0.0);
+        return half4(content.eval(fragCoord).rgb * half(stillShade), 1.0);
+    }
+
     float shade = max(1.0 - liftShade * lift * (0.85 * crease + 0.15), 0.0);
 
     // Glass rotated `tilt` around the hinge line, outer edge rising toward the viewer.

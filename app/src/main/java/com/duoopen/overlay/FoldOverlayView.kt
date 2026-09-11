@@ -27,7 +27,7 @@ import kotlin.math.ceil
  */
 class FoldOverlayView(
     context: Context,
-    snapshot: Bitmap,
+    private val snapshot: Bitmap,
     /** Hinge geometry for this panel; null = centered from the config. */
     foldLine: ((w: Float, h: Float, config: DuoConfig) -> FoldLine)? = null,
     private val renderScale: Float = 2f,
@@ -60,6 +60,15 @@ class FoldOverlayView(
         fold.scaleX = renderScale
         fold.scaleY = renderScale
         fold.setLayerType(LAYER_TYPE_HARDWARE, null)
+    }
+
+    /**
+     * Frees the snapshot once the overlay is off screen, so a multi-megapixel
+     * screenshot isn't left for the GC after every fold. Call on the main
+     * thread only after the view has been removed.
+     */
+    fun release() {
+        if (!snapshot.isRecycled) snapshot.recycle()
     }
 
     override fun onMeasure(widthMeasureSpec: Int, heightMeasureSpec: Int) {

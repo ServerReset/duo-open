@@ -315,15 +315,18 @@ class FoldOverlayService : AccessibilityService() {
         val sw = runCatching { hw.copy(Bitmap.Config.ARGB_8888, false) }.getOrNull() ?: return false
         try {
             val n = 24
-            var maxSum = 0
+            val pixels = IntArray(n * n)
             for (iy in 0 until n) {
                 val y = ((iy + 0.5f) * sw.height / n).toInt()
                 for (ix in 0 until n) {
                     val x = ((ix + 0.5f) * sw.width / n).toInt()
-                    val c = sw.getPixel(x, y)
-                    val sum = ((c shr 16) and 0xFF) + ((c shr 8) and 0xFF) + (c and 0xFF)
-                    if (sum > maxSum) maxSum = sum
+                    pixels[iy * n + ix] = sw.getPixel(x, y)
                 }
+            }
+            var maxSum = 0
+            for (c in pixels) {
+                val sum = ((c shr 16) and 0xFF) + ((c shr 8) and 0xFF) + (c and 0xFF)
+                if (sum > maxSum) maxSum = sum
             }
             return maxSum < BLACK_THRESHOLD
         } finally {
@@ -428,6 +431,7 @@ class FoldOverlayService : AccessibilityService() {
 
     private fun detach(view: FoldOverlayView) {
         runCatching { windowManager?.removeViewImmediate(view) }
+        runCatching { view.release() }
         OverlayState.setRunning(false)
     }
 

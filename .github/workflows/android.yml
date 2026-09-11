@@ -52,26 +52,23 @@ jobs:
               echo "keyAlias=$KEY_ALIAS"
               echo "keyPassword=$KEY_PASSWORD"
             } > keystore.properties
-            echo "Release APK will be signed with the fork keystore."
+            echo "Signing with the fork keystore."
           else
-            echo "No release keystore secret; release APK falls back to the debug key."
+            echo "No keystore secret; release APK will use the debug key."
           fi
 
-      - name: Build debug and release APKs
-        run: ./gradlew --no-daemon --stacktrace assembleDebug assembleRelease
+      - name: Build APK
+        run: ./gradlew --no-daemon --stacktrace assembleRelease
 
-      - name: Collect APKs
+      - name: Stage APK
         run: |
           mkdir -p dist
-          cp app/build/outputs/apk/debug/app-debug.apk \
-             "dist/DuoOpen-${{ steps.version.outputs.name }}-debug.apk"
           cp app/build/outputs/apk/release/app-release.apk \
-             "dist/DuoOpen-${{ steps.version.outputs.name }}-release.apk"
+             "dist/DuoOpen-${{ steps.version.outputs.name }}.apk"
 
-      # No actions/upload-artifact here on purpose: GitHub always wraps
-      # artifacts in a zip. The APKs are published as release assets instead,
-      # which download as plain .apk files.
-
+      # The APK is published as a release asset, which is a plain .apk
+      # download. There is intentionally no actions/upload-artifact step:
+      # GitHub always wraps artifacts in a zip, and a zip is not an APK.
       - name: Publish stable release
         if: startsWith(github.ref, 'refs/tags/')
         uses: softprops/action-gh-release@v2
@@ -80,12 +77,26 @@ jobs:
           generate_release_notes: true
 
       - name: Publish rolling "latest" pre-release
-        if: github.ref == 'refs/heads/main'
+        if: ${{ github.event_name != 'pull_request' && !startsWith(github.ref, 'refs/tags/') }}
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           gh release delete latest --yes --cleanup-tag || true
           gh release create latest dist/*.apk \
             --title "Latest build (${{ steps.version.outputs.name }})" \
-            --notes "Auto-built from ${GITHUB_SHA:0:7}. Install the -release.apk." \
+            --notes "Auto-built from ${GITHUB_SHA:0:7}." \
             --prerelease
+
+      - name: APK download link
+        run: |
+          if [ "${GITHUB_REF#refs/tags/}" != "$GITHUB_REF" ]; then
+            TAG="${GITHUB_REF#refs/tags/}"
+          else
+            TAG="latest"
+          fi
+          URL="https://github.com/${GITHUB_REPOSITORY}/releases/download/${TAG}/DuoOpen-${{ steps.version.outputs.name }}.apk"
+          echo "### APK ready" >> "$GITHUB_STEP_SUMMARY"
+          echo "" >> "$GITHUB_STEP_SUMMARY"
+          echo "[DuoOpen-${{ steps.version.outputs.name }}.apk]($URL)" >> "$GITHUB_STEP_SUMMARY"
+          echo "" >> "$GITHUB_STEP_SUMMARY"
+          echo "$URL" >> "$GITHUB_STEP_SUMMARY"

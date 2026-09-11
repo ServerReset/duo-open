@@ -15,9 +15,11 @@ Based on the AGSL shader from
 The picture behaves like a flat sheet of paper fixed in space. As you open the
 phone the content stays put; the moving half of the display is seen as a clear
 window onto that sheet, so it reads as if the phone is peeling up off the flat
-image and settling back onto it. A soft contact shadow at the crease sells the
-lift. Both panels take part: the cover screen leads over the first ~20° of an
-open, then the inner panel picks up and resolves.
+image and settling back onto it. The lift eases in and out (smoothstep) rather
+than moving at a constant rate, a soft contact shadow sits at the crease, and
+the raised half casts a hint of shadow onto the half still down. Both panels
+take part: the cover screen leads over the first ~20° of an open, then the
+inner panel picks up and resolves.
 
 Prefer the original look? The **Tune** sheet's **Frost** slider brings back the
 frosted-glass pane (and **Darkening** its falloff); at 0 frost the moving half
