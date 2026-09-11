@@ -1,0 +1,108 @@
+// Duo-Unfold — two-pane variant of the Duo-Fold frosted-glass shader
+// (github.com/Atomicx7/Duo-animation), for book-style foldables.
+//
+// Model:
+// - UI content lives on a fixed plane: where the screen would be if fully flat.
+// - Eye is stationary on that plane's normal through the hinge line (how you
+//   naturally look into a half-open book), eyeDistancePx back from the plane.
+// - A half of the display is a glass pane rotated `tiltDegrees` around the
+//   hinge, its outer edge rising toward the viewer. With one half held still
+//   (paneSide = ±1) the other swings through the full (180 - A); with both
+//   moving (paneSide = 0) each pane tilts (180 - A) / 2.
+// - Per pixel: ray eye -> glass point, continued to the UI plane; Vogel-disk
+//   blur with radius proportional to the glass-to-plane gap, dimmed in
+//   proportion to how much it scatters. A fully-missed kernel is black.
+//
+// Uniforms:
+// - tiltDegrees: per-pane tilt, 0 = flat (effect off).
+// - hingePos: hinge line position in px along the split axis.
+// - axisSwap: 0 = hinge is a vertical line (splits x), 1 = horizontal (splits y).
+// - paneSide: which half moves: -1 = left (top), +1 = right (bottom), 0 = both.
+//   The still half renders crisp.
+// - blurSpread: blur radius gained per px of glass/plane separation.
+// - darkening: fraction of light lost per px of blur radius.
+//
+// NOTE: minimal AGSL constructs on purpose (no break/continue, no bool locals,
+// no helper functions) — same constraint the original documents for on-device
+// compilers.
+
+uniform shader content;
+uniform float2 resolution;
+uniform float tiltDegrees;
+uniform float eyeDistancePx;
+uniform float hingePos;
+uniform float eyeX;      // eye position along the split axis (hinge for a split screen, center for a single pane)
+uniform float axisSwap;
+uniform float paneSide;
+uniform float blurSpread;
+uniform float darkening;
+
+const float GOLDEN_ANGLE = 2.39996322972865332; // radians, Vogel disk spacing
+const float TWO_PI = 6.28318530717958648;
+
+half4 main(float2 fragCoord) {
+    if (resolution.x <= 1.0 || resolution.y <= 1.0) {
+        return content.eval(fragCoord);
+    }
+    float tilt = radians(clamp(tiltDegrees, 0.0, 60.0));
+    if (tilt < 1e-4) {
+        return content.eval(fragCoord);
+    }
+
+    // Work in a frame where the hinge is always a vertical line at x = hingePos.
+    float2 p = mix(fragCoord, fragCoord.yx, axisSwap);
+    float2 size = mix(resolution, resolution.yx, axisSwap);
+
+    float side = mix(-1.0, 1.0, step(hingePos, p.x)); // -1 left pane, +1 right pane
+    if (paneSide * side < -0.5) {
+        return content.eval(fragCoord); // the half held still stays flat
+    }
+    float d = abs(p.x - hingePos);                     // distance from hinge along the glass
+
+    // Glass rotated `tilt` around the hinge line, outer edge rising toward the viewer.
+    float2 glass = float2(hingePos + side * d * cos(tilt), p.y);
+    float gap = d * sin(tilt);
+    float2 eye = float2(eyeX, size.y * 0.5);
+
+    // Ray eye -> glass pixel, continued to the UI plane z = 0.
+    float depth = eyeDistancePx - gap;
+    if (depth <= 1e-3) {
+        return half4(0.0, 0.0, 0.0, 1.0);
+    }
+    float2 hitS = eye + (glass - eye) * (eyeDistancePx / depth);
+
+    float radius = blurSpread * gap;
+
+    // Whole blur kernel misses the UI: black.
+    if (hitS.x < -radius || hitS.y < -radius ||
+        hitS.x > size.x + radius || hitS.y > size.y + radius) {
+        return half4(0.0, 0.0, 0.0, 1.0);
+    }
+
+    float2 hit = mix(hitS, hitS.yx, axisSwap);
+
+    // Frosted glass absorbs: dim in proportion to how much it scatters.
+    float atten = max(1.0 - darkening * radius, 0.0);
+
+    if (radius < 0.5) {
+        return half4(content.eval(hit).rgb * half(atten), 1.0);
+    }
+
+    // Vogel disk with per-pixel rotation (banding becomes frosted-glass grain).
+    // Fixed 32-iteration loop with a weight mask (no break) keeps frames cheap
+    // near the hinge and compiles everywhere.
+    float tapsF = clamp(radius * 2.0, 6.0, 32.0);
+    float rotation = fract(sin(dot(fragCoord, float2(12.9898, 78.233))) * 43758.5453) * TWO_PI;
+    half3 sum = half3(0.0);
+    float wsum = 0.0;
+    for (int i = 0; i < 32; i++) {
+        float fi = float(i);
+        float w = 1.0 - step(tapsF, fi);
+        float r = radius * sqrt((fi + 0.5) / tapsF);
+        float a = fi * GOLDEN_ANGLE + rotation;
+        sum += content.eval(hit + r * float2(cos(a), sin(a))).rgb * half(w);
+        wsum += w;
+    }
+    half3 avg = sum / half(max(wsum, 1.0));
+    return half4(avg * half(atten), 1.0);
+}

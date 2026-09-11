@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Two panes of an unfolding book-style display, outer edges nearer the viewer. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <path
+        android:fillColor="#FF7B5CFF"
+        android:pathData="M30,32 L52.5,37 L52.5,71 L30,76 Z" />
+    <path
+        android:fillColor="#FFF0564A"
+        android:pathData="M55.5,37 L78,32 L78,76 L55.5,71 Z" />
+</vector>
