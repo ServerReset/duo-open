@@ -59,12 +59,15 @@ class HingeAngleSource(
 
     private val keepAlive = object : Runnable {
         override fun run() {
-            if (!started) return
-            if (lastEventAgeMs() > STALE_MS) {
-                Log.i(TAG, "no hinge events for ${lastEventAgeMs()}ms; re-registering")
+            if (!started || sensor == null) return
+            // If no reading has arrived since the last poll, force one by
+            // re-registering. On hinges that report once and then go quiet
+            // (or only fire at a coarse cadence) this is what turns the effect
+            // from a slow staircase into a continuous, live feed.
+            if (SystemClock.uptimeMillis() - lastEventUptime >= POLL_STALE_MS) {
                 reRegister()
             }
-            handler.postDelayed(this, KEEPALIVE_INTERVAL_MS)
+            handler.postDelayed(this, POLL_INTERVAL_MS)
         }
     }
 
@@ -85,8 +88,12 @@ class HingeAngleSource(
     fun start() {
         if (started) return
         started = true
+        if (sensor == null) {
+            Log.w(TAG, "no hinge sensor found")
+            return
+        }
         register()
-        handler.postDelayed(keepAlive, KEEPALIVE_INTERVAL_MS)
+        handler.postDelayed(keepAlive, POLL_INTERVAL_MS)
     }
 
     /**
@@ -108,13 +115,11 @@ class HingeAngleSource(
     }
 
     private fun reRegister() {
-        val s = sensor ?: return
         sensorManager?.unregisterListener(this)
-        register()
-        Log.i(TAG, "re-registered ${s.name}")
+        register(verbose = false)
     }
 
-    private fun register() {
+    private fun register(verbose: Boolean = true) {
         val s = sensor ?: run {
             Log.w(TAG, "no hinge sensor found")
             return
@@ -122,11 +127,14 @@ class HingeAngleSource(
         val target = if (powerSave) SLOW_PERIOD_US else FAST_PERIOD_US
         val periodUs = if (s.minDelay > target) s.minDelay else target
         val ok = sensorManager?.registerListener(this, s, periodUs) == true
-        Log.i(
-            TAG,
-            "hinge sensor=${s.name} type=${s.stringType} wakeUp=${s.isWakeUpSensor} " +
-                "minDelay=${s.minDelay}us period=${periodUs}us powerSave=$powerSave ok=$ok",
-        )
+        if (verbose) {
+            Log.i(
+                TAG,
+                "hinge sensor=${s.name} type=${s.stringType} wakeUp=${s.isWakeUpSensor} " +
+                    "reportingMode=${s.reportingMode} minDelay=${s.minDelay}us " +
+                    "period=${periodUs}us powerSave=$powerSave ok=$ok",
+            )
+        }
     }
 
     override fun onSensorChanged(event: SensorEvent) {
@@ -175,9 +183,9 @@ class HingeAngleSource(
         const val FAST_PERIOD_US = 0
         /** ~15 Hz under Battery Saver: plenty to follow a fold, far fewer wakeups. */
         const val SLOW_PERIOD_US = 66_000
-        /** How often to check for a stalled sensor. */
-        const val KEEPALIVE_INTERVAL_MS = 400L
-        /** Silence longer than this triggers a re-registration to force a reading. */
-        const val STALE_MS = 700L
+        /** Poll at ~60 fps so the effect never waits on a sparse hinge feed. */
+        const val POLL_INTERVAL_MS = 16L
+        /** No reading for this long means the sensor stalled; force one. */
+        const val POLL_STALE_MS = 30L
     }
 }

@@ -14,6 +14,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableIntStateOf
@@ -55,11 +56,12 @@ fun DuoApp(foldLineFlow: StateFlow<FoldLine?>) {
 
     var hingeAngle by remember { mutableFloatStateOf(Float.NaN) }
     val hinge = remember { HingeAngleSource(context.applicationContext) { hingeAngle = it } }
-    // Only listen while the app is in front; a backgrounded preview has no
-    // reason to wake up on every hinge move.
-    LifecycleResumeEffect(hinge) {
+    // Keep the sensor registered for the whole composition. Tying it to
+    // onResume/onPause stopped it whenever the fold briefly paused or refocused
+    // the activity, which is what made the display only catch up on reopen.
+    DisposableEffect(hinge) {
         hinge.start()
-        onPauseOrDispose { hinge.stop() }
+        onDispose { hinge.stop() }
     }
     val batterySaver by PowerState.batterySaver.collectAsStateWithLifecycle()
 
