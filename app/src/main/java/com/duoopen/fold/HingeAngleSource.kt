@@ -70,6 +70,9 @@ class HingeAngleSource(
     private var rateWindowStart = 0L
     private var rateWindowCount = 0
 
+    /** Last time the reported angle actually changed (not just a repeat event). */
+    private var lastChangeUptime = 0L
+
     private class Stat {
         var count = 0
         var minVal = Float.MAX_VALUE
@@ -225,9 +228,20 @@ class HingeAngleSource(
         tickRate(now)
 
         val smooth = filter(raw, now)
+        val changed = lastAngle.isNaN() || abs(smooth - lastAngle) >= CHANGE_EPSILON
         lastAngle = smooth
-        onAngle(smooth)
+        // Only report a real change, so downstream movement timers reflect the
+        // hinge actually moving — not repeated identical sensor events.
+        if (changed) {
+            lastChangeUptime = now
+            onAngle(smooth)
+        }
     }
+
+    /** Milliseconds since the angle last changed, or huge if it never has. */
+    fun millisSinceChange(): Long =
+        if (lastChangeUptime == 0L) Long.MAX_VALUE
+        else SystemClock.uptimeMillis() - lastChangeUptime
 
     override fun onAccuracyChanged(sensor: Sensor?, accuracy: Int) = Unit
 
@@ -309,6 +323,7 @@ class HingeAngleSource(
         const val TAG = "DuoHinge"
         const val DEVICE_PRIVATE_BASE = 0x10000
         const val DEADBAND_DEG = 0.3f
+        const val CHANGE_EPSILON = 0.05f
         const val ACTIVE_GAP_MS = 1_200f
     }
 }

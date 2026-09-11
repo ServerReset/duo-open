@@ -214,6 +214,13 @@ class FoldOverlayService : AccessibilityService() {
         }
         val angle = hinge.lastAngle
         if (angle.isNaN()) return
+        // Only act while the hinge is actually moving; a static mid-angle
+        // reading must not keep the effect up.
+        if (hinge.millisSinceChange() > MOVE_WINDOW_MS) {
+            restArmed = true
+            panelSwitched = false
+            return
+        }
         // Same flat/stuck guard as onHinge: no capture while >=175° or while the
         // raw sensor sits at the open endpoint with no gyro motion.
         if (angle > TRIGGER_HINGE || (hinge.rawAngle >= 179f && !hinge.gyroActive)) {
@@ -516,6 +523,8 @@ class FoldOverlayService : AccessibilityService() {
         private const val EVALUATE_MIN_INTERVAL_MS = 50L
         /** Don't start/show the effect while the phone is essentially flat. */
         private const val TRIGGER_HINGE = 175f
+        /** The hinge must have changed within this window to count as moving. */
+        private const val MOVE_WINDOW_MS = 500L
         /** Hard cap on a single overlay showing, so it can never stay stuck. */
         private const val MAX_SHOW_MS = 3_000L
         private const val FADE_IN_MS = 140L
