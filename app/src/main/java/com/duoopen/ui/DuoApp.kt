@@ -10,14 +10,10 @@ import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
-import androidx.compose.animation.core.Spring
-import androidx.compose.animation.core.animateFloatAsState
-import androidx.compose.animation.core.spring
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableIntStateOf
@@ -67,17 +63,6 @@ fun DuoApp(foldLineFlow: StateFlow<FoldLine?>) {
     }
     val batterySaver by PowerState.batterySaver.collectAsStateWithLifecycle()
 
-    // Ticks the sensor diagnostic even when no events are arriving, so "no
-    // events yet" is visible instead of a frozen reading.
-    var diagTick by remember { mutableIntStateOf(0) }
-    LaunchedEffect(Unit) {
-        while (true) {
-            kotlinx.coroutines.delay(500)
-            diagTick++
-        }
-    }
-    val sensorStatus = remember(diagTick, hingeAngle) { hinge.statusText() }
-
     // Without a hinge sensor (emulator, non-foldable) the slider is the only input.
     var simulate by rememberSaveable { mutableStateOf(hinge.sensor == null) }
     var simulatedAngle by rememberSaveable { mutableFloatStateOf(120f) }
@@ -86,11 +71,9 @@ fun DuoApp(foldLineFlow: StateFlow<FoldLine?>) {
     LocalConfiguration.current
     val onCover = !simulate && hinge.sensor != null && !context.display.isInnerPanel()
     val targetTilt = if (angle.isNaN() || onCover) 0f else DuoShader.tiltForHinge(angle, config)
-    val paneTilt by animateFloatAsState(
-        targetValue = targetTilt,
-        animationSpec = spring(dampingRatio = Spring.DampingRatioNoBouncy, stiffness = 900f),
-        label = "paneTilt",
-    )
+    // Drive the effect straight from the sensor value — no spring/animation
+    // layer, so it reacts the instant the hinge moves.
+    val paneTilt = targetTilt
 
     val shader = remember { DuoShader.create(context) }
     // In Battery Saver the preview stays flat too, matching the services.
@@ -133,7 +116,7 @@ fun DuoApp(foldLineFlow: StateFlow<FoldLine?>) {
             paneTilt = paneTilt,
             simulate = simulate,
             sensorPresent = hinge.sensor != null,
-            sensorStatus = sensorStatus,
+            sensorStatus = { hinge.statusText() },
             simulatedAngle = simulatedAngle,
             onSimulateChange = { simulate = it },
             onSimulatedAngleChange = { simulatedAngle = it },

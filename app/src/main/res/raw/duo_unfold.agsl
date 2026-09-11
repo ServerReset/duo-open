@@ -89,13 +89,13 @@ half4 main(float2 fragCoord) {
     }
 
     // Vogel disk with per-pixel rotation (banding becomes frosted-glass grain).
-    // Fixed 32-iteration loop with a weight mask (no break) keeps frames cheap
-    // near the hinge and compiles everywhere.
-    float tapsF = clamp(radius * 2.0, 6.0, 32.0);
+    // 16 fixed taps keeps the full-screen preview cheap enough to stay in sync
+    // with the hinge (AGSL needs a constant loop bound).
+    float tapsF = clamp(radius * 2.0, 6.0, 16.0);
     float rotation = fract(sin(dot(fragCoord, float2(12.9898, 78.233))) * 43758.5453) * TWO_PI;
     half3 sum = half3(0.0);
     float wsum = 0.0;
-    for (int i = 0; i < 32; i++) {
+    for (int i = 0; i < 16; i++) {
         float fi = float(i);
         float w = 1.0 - step(tapsF, fi);
         float r = radius * sqrt((fi + 0.5) / tapsF);

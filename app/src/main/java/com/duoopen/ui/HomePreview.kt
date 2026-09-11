@@ -26,6 +26,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -60,7 +61,7 @@ fun HomePreview(
     paneTilt: Float,
     simulate: Boolean,
     sensorPresent: Boolean,
-    sensorStatus: String,
+    sensorStatus: () -> String,
     simulatedAngle: Float,
     onSimulateChange: (Boolean) -> Unit,
     onSimulatedAngleChange: (Float) -> Unit,
@@ -224,7 +225,7 @@ private fun SetupBanner(onSetup: () -> Unit) {
 private fun SimulatorCard(
     simulate: Boolean,
     sensorPresent: Boolean,
-    sensorStatus: String,
+    sensorStatus: () -> String,
     angle: Float,
     onSimulateChange: (Boolean) -> Unit,
     onAngleChange: (Float) -> Unit,
@@ -245,11 +246,8 @@ private fun SimulatorCard(
                     fontWeight = FontWeight.SemiBold,
                     fontSize = 14.sp,
                 )
-                Text(
-                    if (sensorPresent) sensorStatus else "No hinge sensor — slider only",
-                    color = Dim,
-                    fontSize = 11.sp,
-                )
+                if (sensorPresent) SensorStatusLine(sensorStatus)
+                else Text("No hinge sensor — slider only", color = Dim, fontSize = 11.sp)
             }
             Switch(
                 checked = simulate,
@@ -267,6 +265,21 @@ private fun SimulatorCard(
             Text("Hinge %.0f°".format(angle), color = Dim, fontSize = 11.sp)
         }
     }
+}
+
+@Composable
+private fun SensorStatusLine(status: () -> String) {
+    // Own ticker so the status refreshes even with no events, without
+    // recomposing the whole screen.
+    var tick by remember { mutableIntStateOf(0) }
+    LaunchedEffect(Unit) {
+        while (true) {
+            delay(400)
+            tick++
+        }
+    }
+    val text = remember(tick) { status() }
+    Text(text, color = Dim, fontSize = 11.sp)
 }
 
 @Composable

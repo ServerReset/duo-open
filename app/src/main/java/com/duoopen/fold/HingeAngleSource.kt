@@ -171,11 +171,13 @@ class HingeAngleSource(
 
     private companion object {
         const val TAG = "DuoHinge"
-        /** Original 125 Hz registration — most responsive, no added lag. */
-        const val FAST_PERIOD_US = 8_000
+        /** 0 = fastest the sensor allows (clamped to minDelay), for instant tracking. */
+        const val FAST_PERIOD_US = 0
         /** ~15 Hz under Battery Saver: plenty to follow a fold, far fewer wakeups. */
         const val SLOW_PERIOD_US = 66_000
-        const val KEEPALIVE_INTERVAL_MS = 1_000L
-        const val STALE_MS = 1_200L
+        /** How often to check for a stalled sensor. */
+        const val KEEPALIVE_INTERVAL_MS = 400L
+        /** Silence longer than this triggers a re-registration to force a reading. */
+        const val STALE_MS = 700L
     }
 }

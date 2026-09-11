@@ -61,6 +61,10 @@ class TiltFollower(private val onFrame: (tilt: Float) -> Unit) : Choreographer.F
     }
 
     companion object {
-        const val DEFAULT_TAU_S = 0.045f
+        /**
+         * Small time constant: just enough to smooth the sensor's discrete
+         * steps without a perceptible lag behind the hinge.
+         */
+        const val DEFAULT_TAU_S = 0.02f
     }
 }
