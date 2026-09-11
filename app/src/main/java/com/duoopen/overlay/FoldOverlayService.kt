@@ -342,17 +342,8 @@ class FoldOverlayService : AccessibilityService() {
             .also { windowManager = it }
 
         val inner = innerPanel
-        val cfg = DuoSettings.config.value
-        // A clear "sheet" (no blur) is a single texture sample, so render it at
-        // full resolution; only the frosted look needs the half-res blur layer.
-        val renderScale = if (cfg.blurSpread < 0.01f) 1f else 2f
-        val view = FoldOverlayView(
-            this,
-            bitmap,
-            { w, h, c -> DuoShader.foldFor(inner, w, h, c) },
-            renderScale = renderScale,
-        ).apply {
-            config = cfg
+        val view = FoldOverlayView(this, bitmap, { w, h, c -> DuoShader.foldFor(inner, w, h, c) }).apply {
+            config = DuoSettings.config.value
             tilt = startTilt
         }
         val params = WindowManager.LayoutParams(
@@ -484,7 +475,7 @@ class FoldOverlayService : AccessibilityService() {
         /** Ease time constant for the timed resolve (≈ 250 ms to settle). */
         private const val TIMED_RESOLVE_TAU_S = 0.07f
         /** Tilt hysteresis for leaving a rest pose, so hinge jitter doesn't fire. */
-        private const val REST_LEAVE_TILT = 1f
+        private const val REST_LEAVE_TILT = 3f
         /** After a swap, don't bother if the fold is nearly finished by capture time. */
         private const val SKIP_INNER_ABOVE_HINGE = 135f
         private const val SKIP_COVER_BELOW_HINGE = 10f

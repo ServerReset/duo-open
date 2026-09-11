@@ -12,18 +12,17 @@ Based on the AGSL shader from
 
 ## What it does
 
-The picture behaves like a flat sheet of paper fixed in space. As you open the
-phone the content stays put; the moving half of the display is seen as a clear
-window onto that sheet, so it reads as if the phone is peeling up off the flat
-image and settling back onto it. The lift eases in and out (smoothstep) rather
-than moving at a constant rate, a soft contact shadow sits at the crease, and
-the raised half casts a hint of shadow onto the half still down. Both panels
-take part: the cover screen leads over the first ~20° of an open, then the
-inner panel picks up and resolves.
+Each half of the screen acts as a pane of frosted glass hinged at the crease.
+While the phone is partly folded the moving half is blurred and darkened by
+how far it is from flat; as the hinge reaches 180° the picture settles into
+focus. This is the original Duo look, kept as-is because it reads well on
+hardware. Both panels take part: the cover screen frosts in over the first
+~20° of an open, then the inner screen picks up frosted and clears.
 
-Prefer the original look? The **Tune** sheet's **Frost** slider brings back the
-frosted-glass pane (and **Darkening** its falloff); at 0 frost the moving half
-stays clear, which is the default.
+The hinge is read at full rate and passed straight through — no smoothing or
+lag — and a slow keep-alive re-registers the sensor if it goes quiet, so the
+effect tracks the hinge in real time on hinges that report once and then stay
+silent instead of only updating when the app is reopened.
 
 It works over *everything* — your own wallpaper, icons, widgets, the lock
 screen, whatever app is open — because it runs as an accessibility service
@@ -54,7 +53,7 @@ wallpaper mode if you'd rather not enable an accessibility service.
 3. Fold the phone partway and open it. **Tune → Test it now** replays the
    effect without folding.
 
-The **Tune** sheet has strength, lift, frost, darkening, eye distance, which
+The **Tune** sheet has strength, frost, darkening, eye distance, which
 half moves (left/right/both) and which edge the cover-screen frost comes from.
 The **main screen** has the hinge simulator (switch + slider) so you can play
 the effect in real time, plus the live hinge-sensor readout.
@@ -115,7 +114,7 @@ watch it with `adb logcat -s DuoOverlay` (sensor logs are under `DuoHinge`).
 ## Layout
 
 ```
-app/src/main/res/raw/duo_unfold.agsl      sheet shader (hinge, moving side, eye, lift shade)
+app/src/main/res/raw/duo_unfold.agsl      fold shader (hinge, moving side, eye, blur)
 fold/DuoShader.kt                         uniforms, hinge→tilt mapping, fold placement
 fold/HingeAngleSource.kt                  TYPE_HINGE_ANGLE discovery + vendor fallback
 fold/AngleFilter.kt                       adaptive 1€ filter: live, jitter-free angle
@@ -142,15 +141,14 @@ settings/DuoSettings.kt                   shared tuning (SharedPreferences + Sta
 ## Galaxy Z Fold notes
 
 - Samsung exposes the hinge through the platform `TYPE_HINGE_ANGLE` sensor
-  (usually alongside a wake-up variant), and which instance actually reports
-  varies by model. So the app now **listens to every hinge sensor at once** and
-  locks onto whichever is delivering events — no more latching onto a silent
-  one. The **main screen** shows the live sensor line (`name · Hz · raw · age`)
-  so you can see at a glance whether readings are arriving.
-- Its readings arrive in coarse steps with a little noise, so the raw value is
-  run through an adaptive 1€ filter (`fold/AngleFilter.kt`): heavy smoothing at
-  rest, light while the hinge moves. The readout shows one decimal, so live
-  motion is visible instead of jumping whole degrees.
+  (usually alongside a wake-up variant). The app picks the continuous one
+  first, then a wake-up/vendor one, and reads it at full rate. The **main
+  screen** shows a live sensor line (`name · Hz · raw · age`) so you can see at
+  a glance whether readings are arriving.
+- Some hinges report once on registration and then stay quiet. A slow
+  keep-alive re-registers the sensor whenever readings go stale, so the effect
+  keeps tracking the hinge in real time instead of only refreshing when the app
+  is reopened.
 - The main screen also has the **Simulate hinge** switch and slider, so you can
   play the effect and watch it in real time without folding (handy when the
   Accessibility service isn't enabled yet).

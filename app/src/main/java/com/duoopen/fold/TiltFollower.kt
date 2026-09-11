@@ -61,6 +61,6 @@ class TiltFollower(private val onFrame: (tilt: Float) -> Unit) : Choreographer.F
     }
 
     companion object {
-        const val DEFAULT_TAU_S = 0.035f
+        const val DEFAULT_TAU_S = 0.045f
     }
 }

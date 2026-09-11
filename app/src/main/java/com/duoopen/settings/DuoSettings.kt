@@ -27,16 +27,9 @@ import kotlinx.coroutines.flow.asStateFlow
  */
 data class DuoConfig(
     val intensity: Float = 1f,
-    /**
-     * Frosted-glass look. 0 = a clear "flat sheet" (the default): the moving
-     * half shows the same image, foreshortened, as if the phone is peeling off
-     * a fixed sheet of paper. Raise it for the original frosted pane.
-     */
-    val blurSpread: Float = 0f,
-    val darkening: Float = 0f,
-    /** Matte contact shadow near the crease that sells the lift. */
-    val liftShade: Float = 0.55f,
-    val eyeDistanceMm: Float = 220f,
+    val blurSpread: Float = 0.12f,
+    val darkening: Float = 0.015f,
+    val eyeDistanceMm: Float = 450f,
     val foldSplitsLong: Boolean = false,
     val movingSide: Int = -1,
     val coverFrostFromRight: Boolean = true,
@@ -48,6 +41,13 @@ data class DuoConfig(
 object DuoSettings {
     private const val PREFS = "duo_open"
 
+    /**
+     * Bumped when the look defaults change. Anything older gets its look tuning
+     * reset once, so an install that ran a different effect style picks up the
+     * current one instead of a stale blur/eye-distance left in prefs.
+     */
+    private const val TUNING_VERSION = 2
+
     private lateinit var prefs: SharedPreferences
     private val _config = MutableStateFlow(DuoConfig())
     val config: StateFlow<DuoConfig> = _config.asStateFlow()
@@ -55,11 +55,19 @@ object DuoSettings {
     fun init(context: Context) {
         prefs = context.applicationContext.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
         val d = DuoConfig()
+        if (prefs.getInt("tuningVersion", 0) < TUNING_VERSION) {
+            prefs.edit {
+                putFloat("blurSpread", d.blurSpread)
+                putFloat("darkening", d.darkening)
+                putFloat("eyeDistanceMm", d.eyeDistanceMm)
+                remove("liftShade")
+                putInt("tuningVersion", TUNING_VERSION)
+            }
+        }
         _config.value = DuoConfig(
             intensity = prefs.getFloat("intensity", d.intensity),
             blurSpread = prefs.getFloat("blurSpread", d.blurSpread),
             darkening = prefs.getFloat("darkening", d.darkening),
-            liftShade = prefs.getFloat("liftShade", d.liftShade),
             eyeDistanceMm = prefs.getFloat("eyeDistanceMm", d.eyeDistanceMm),
             foldSplitsLong = prefs.getBoolean("foldSplitsLong", d.foldSplitsLong),
             movingSide = prefs.getInt("movingSide", d.movingSide),
@@ -77,7 +85,6 @@ object DuoSettings {
             putFloat("intensity", next.intensity)
             putFloat("blurSpread", next.blurSpread)
             putFloat("darkening", next.darkening)
-            putFloat("liftShade", next.liftShade)
             putFloat("eyeDistanceMm", next.eyeDistanceMm)
             putBoolean("foldSplitsLong", next.foldSplitsLong)
             putInt("movingSide", next.movingSide)

@@ -134,23 +134,11 @@ fun ControlSheet(
                 range = 0.5f..3f,
             )
             LabeledSlider(
-                label = "Lift",
-                valueText = "%.2f".format(config.liftShade),
-                value = config.liftShade,
-                onValueChange = { v -> DuoSettings.update { it.copy(liftShade = v) } },
-                range = 0f..1f,
-            )
-            LabeledSlider(
                 label = "Frost",
-                valueText = if (config.blurSpread < 0.005f) "clear" else "%.2f".format(config.blurSpread),
+                valueText = "%.2f".format(config.blurSpread),
                 value = config.blurSpread,
                 onValueChange = { v -> DuoSettings.update { it.copy(blurSpread = v) } },
-                range = 0f..0.3f,
-            )
-            Text(
-                "At 0 frost the moving half stays clear: it shows the same flat image, foreshortened, so the phone feels like it lifts off a fixed sheet of paper.",
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                range = 0.02f..0.3f,
             )
             LabeledSlider(
                 label = "Darkening",
@@ -164,7 +152,7 @@ fun ControlSheet(
                 valueText = "${config.eyeDistanceMm.roundToInt()} mm",
                 value = config.eyeDistanceMm,
                 onValueChange = { v -> DuoSettings.update { it.copy(eyeDistanceMm = v) } },
-                range = 100f..800f,
+                range = 200f..800f,
             )
             Row(
                 Modifier.fillMaxWidth(),

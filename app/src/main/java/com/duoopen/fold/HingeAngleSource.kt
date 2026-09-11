@@ -5,23 +5,22 @@ import android.hardware.Sensor
 import android.hardware.SensorEvent
 import android.hardware.SensorEventListener
 import android.hardware.SensorManager
+import android.os.Handler
+import android.os.Looper
 import android.os.SystemClock
 import android.util.Log
 
 /**
- * Reports the foldable's hinge angle in degrees (0 = closed, 180 = flat).
+ * Reports the foldable's hinge angle in degrees (0 = closed, 180 = flat),
+ * passing the raw sensor value straight through so the effect tracks the hinge
+ * in real time — no smoothing or lag.
  *
- * It listens to *every* hinge-capable sensor at once — the platform
- * `TYPE_HINGE_ANGLE` (continuous preferred) plus any vendor sensor whose type
- * or name mentions "hinge" — and locks onto whichever actually delivers
- * readings. Some vendors expose several, and which one talks (or stays silent)
- * varies by model; trying them all is what makes it work across the Galaxy Z
- * Fold line instead of latching onto a silent sensor.
- *
- * The raw stream is passed through an adaptive [AngleFilter]. Several vendors —
- * Galaxy Z Fold included — report the angle in coarse steps plus a little
- * noise; filtering turns that staircase into a continuous, live curve without
- * adding perceptible lag while the hinge actually moves.
+ * Sensor choice matches the original app: the platform `TYPE_HINGE_ANGLE`
+ * sensor (continuous before wake-up), then any vendor sensor whose type or name
+ * mentions "hinge". A slow keep-alive re-registers the listener if readings go
+ * quiet, which forces the HAL to hand back the current angle on the quirky
+ * hinges that report once and then stay silent — that's what keeps the display
+ * live instead of only updating when the app is reopened.
  */
 class HingeAngleSource(
     context: Context,
@@ -29,18 +28,18 @@ class HingeAngleSource(
 ) : SensorEventListener {
 
     private val sensorManager = context.getSystemService(SensorManager::class.java)
+    private val handler = Handler(Looper.getMainLooper())
 
     /** Every hinge-capable sensor found, best candidate first. */
     val sensors: List<Sensor> = sensorManager?.let(::findHingeSensors).orEmpty()
 
-    /** Preferred sensor (first candidate), for labelling. */
+    /** The sensor being read. */
     val sensor: Sensor? = sensors.firstOrNull()
 
-    /** The candidate currently delivering events, if any. */
-    var activeSensor: Sensor? = null
-        private set
+    /** Same as [sensor]; kept so the UI has one obvious "active" name. */
+    val activeSensor: Sensor? get() = sensor
 
-    /** Latest filtered (smoothed) hinge angle. NaN until the first reading. */
+    /** Latest hinge angle. NaN until the first reading. */
     var lastAngle: Float = Float.NaN
         private set
 
@@ -52,13 +51,22 @@ class HingeAngleSource(
     var rateHz: Float = 0f
         private set
 
-    private val filter = AngleFilter()
     private var started = false
     private var powerSave = false
-
     private var lastEventUptime = 0L
     private var rateWindowStart = 0L
     private var rateWindowCount = 0
+
+    private val keepAlive = object : Runnable {
+        override fun run() {
+            if (!started) return
+            if (lastEventAgeMs() > STALE_MS) {
+                Log.i(TAG, "no hinge events for ${lastEventAgeMs()}ms; re-registering")
+                reRegister()
+            }
+            handler.postDelayed(this, KEEPALIVE_INTERVAL_MS)
+        }
+    }
 
     /** Milliseconds since the last reading, or [Long.MAX_VALUE] if none yet. */
     fun lastEventAgeMs(): Long =
@@ -66,7 +74,7 @@ class HingeAngleSource(
 
     /** One-line diagnostic for the UI: which sensor, how fast, and the raw value. */
     fun statusText(): String {
-        val name = activeSensor?.name ?: sensor?.name ?: "no sensor"
+        val name = sensor?.name ?: "no sensor"
         val age = lastEventAgeMs()
         val ageText = if (age == Long.MAX_VALUE) "no events yet" else "last ${age}ms"
         val rate = if (rateHz > 0f) "%.0f Hz".format(rateHz) else "idle"
@@ -77,7 +85,8 @@ class HingeAngleSource(
     fun start() {
         if (started) return
         started = true
-        registerAll()
+        register()
+        handler.postDelayed(keepAlive, KEEPALIVE_INTERVAL_MS)
     }
 
     /**
@@ -88,61 +97,47 @@ class HingeAngleSource(
         if (powerSave == enabled) return
         powerSave = enabled
         if (!started) return
-        sensorManager?.unregisterListener(this)
-        registerAll()
-    }
-
-    private fun registerAll() {
-        val sm = sensorManager ?: return
-        if (sensors.isEmpty()) {
-            Log.w(TAG, "no hinge sensors found")
-            return
-        }
-        filter.reset()
-        activeSensor = null
-        lastEventUptime = 0L
-        val target = if (powerSave) SLOW_PERIOD_US else FAST_PERIOD_US
-        for (s in sensors) {
-            val periodUs = if (s.minDelay > target) s.minDelay else target
-            val ok = sm.registerListener(this, s, periodUs)
-            Log.i(
-                TAG,
-                "registered hinge candidate name=${s.name} type=${s.stringType} " +
-                    "wakeUp=${s.isWakeUpSensor} minDelay=${s.minDelay}us period=${periodUs}us ok=$ok",
-            )
-        }
+        reRegister()
     }
 
     fun stop() {
         if (!started) return
         started = false
+        handler.removeCallbacks(keepAlive)
         sensorManager?.unregisterListener(this)
     }
 
-    override fun onSensorChanged(event: SensorEvent) {
-        val s = event.sensor
-        val now = SystemClock.uptimeMillis()
+    private fun reRegister() {
+        val s = sensor ?: return
+        sensorManager?.unregisterListener(this)
+        register()
+        Log.i(TAG, "re-registered ${s.name}")
+    }
 
-        // Lock onto the first sensor that talks, but switch if it goes quiet for
-        // a while and another candidate is still reporting.
-        val current = activeSensor
-        if (current == null || (s.name != current.name && now - lastEventUptime > SWITCH_TIMEOUT_MS)) {
-            if (current?.name != s.name) Log.i(TAG, "active hinge sensor -> ${s.name}")
-            activeSensor = s
-            filter.reset()
+    private fun register() {
+        val s = sensor ?: run {
+            Log.w(TAG, "no hinge sensor found")
+            return
         }
-        if (s.name != activeSensor?.name) return
+        val target = if (powerSave) SLOW_PERIOD_US else FAST_PERIOD_US
+        val periodUs = if (s.minDelay > target) s.minDelay else target
+        val ok = sensorManager?.registerListener(this, s, periodUs) == true
+        Log.i(
+            TAG,
+            "hinge sensor=${s.name} type=${s.stringType} wakeUp=${s.isWakeUpSensor} " +
+                "minDelay=${s.minDelay}us period=${periodUs}us powerSave=$powerSave ok=$ok",
+        )
+    }
 
+    override fun onSensorChanged(event: SensorEvent) {
         val raw = event.values.firstOrNull() ?: return
         if (!raw.isFinite()) return
-
+        val now = SystemClock.uptimeMillis()
         lastEventUptime = now
         rawAngle = raw
+        lastAngle = raw
         tickRate(now)
-
-        val smooth = filter.filter(raw, event.timestamp)
-        lastAngle = smooth
-        onAngle(smooth)
+        onAngle(raw)
     }
 
     override fun onAccuracyChanged(sensor: Sensor?, accuracy: Int) = Unit
@@ -176,11 +171,11 @@ class HingeAngleSource(
 
     private companion object {
         const val TAG = "DuoHinge"
-        /** ~50 Hz is plenty for a hand-driven fold and far lighter than 125 Hz. */
-        const val FAST_PERIOD_US = 20_000
+        /** Original 125 Hz registration — most responsive, no added lag. */
+        const val FAST_PERIOD_US = 8_000
         /** ~15 Hz under Battery Saver: plenty to follow a fold, far fewer wakeups. */
         const val SLOW_PERIOD_US = 66_000
-        /** How long a silent active sensor is tolerated before another can take over. */
-        const val SWITCH_TIMEOUT_MS = 1_500L
+        const val KEEPALIVE_INTERVAL_MS = 1_000L
+        const val STALE_MS = 1_200L
     }
 }
