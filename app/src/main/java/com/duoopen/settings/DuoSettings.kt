@@ -35,8 +35,8 @@ data class DuoConfig(
     val blurSpread: Float = 0f,
     val darkening: Float = 0f,
     /** Matte contact shadow near the crease that sells the lift. */
-    val liftShade: Float = 0.4f,
-    val eyeDistanceMm: Float = 450f,
+    val liftShade: Float = 0.55f,
+    val eyeDistanceMm: Float = 220f,
     val foldSplitsLong: Boolean = false,
     val movingSide: Int = -1,
     val coverFrostFromRight: Boolean = true,

@@ -45,7 +45,7 @@ half4 main(float2 fragCoord) {
     if (resolution.x <= 1.0 || resolution.y <= 1.0) {
         return content.eval(fragCoord);
     }
-    float tilt = radians(clamp(tiltDegrees, 0.0, 60.0));
+    float tilt = radians(clamp(tiltDegrees, 0.0, 85.0));
     if (tilt < 1e-4) {
         return content.eval(fragCoord);
     }
@@ -85,11 +85,9 @@ half4 main(float2 fragCoord) {
 
     float radius = blurSpread * gap;
 
-    // Whole blur kernel misses the UI: black.
-    if (hitS.x < -radius || hitS.y < -radius ||
-        hitS.x > size.x + radius || hitS.y > size.y + radius) {
-        return half4(0.0, 0.0, 0.0, 1.0);
-    }
+    // Keep the sample on the sheet. A strong lift throws the ray past the edge;
+    // clamping reads as the sheet continuing instead of a black wedge.
+    hitS = clamp(hitS, float2(0.0), size);
 
     float2 hit = mix(hitS, hitS.yx, axisSwap);
 

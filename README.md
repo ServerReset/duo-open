@@ -55,8 +55,9 @@ wallpaper mode if you'd rather not enable an accessibility service.
    effect without folding.
 
 The **Tune** sheet has strength, lift, frost, darkening, eye distance, which
-half moves (left/right/both), which edge the cover-screen frost comes from,
-and a hinge simulator.
+half moves (left/right/both) and which edge the cover-screen frost comes from.
+The **main screen** has the hinge simulator (switch + slider) so you can play
+the effect in real time, plus the live hinge-sensor readout.
 
 Wallpaper-only mode: **Set live wallpaper** in the app (home + lock screen).
 Only the wallpaper folds in that mode; icons stay sharp.
@@ -141,12 +142,18 @@ settings/DuoSettings.kt                   shared tuning (SharedPreferences + Sta
 ## Galaxy Z Fold notes
 
 - Samsung exposes the hinge through the platform `TYPE_HINGE_ANGLE` sensor
-  (usually alongside a wake-up variant). The app lists every hinge sensor it
-  finds on the **Tune** sheet and prefers the continuous one.
+  (usually alongside a wake-up variant), and which instance actually reports
+  varies by model. So the app now **listens to every hinge sensor at once** and
+  locks onto whichever is delivering events — no more latching onto a silent
+  one. The **main screen** shows the live sensor line (`name · Hz · raw · age`)
+  so you can see at a glance whether readings are arriving.
 - Its readings arrive in coarse steps with a little noise, so the raw value is
   run through an adaptive 1€ filter (`fold/AngleFilter.kt`): heavy smoothing at
-  rest, light while the hinge moves. The **Tune** readout shows one decimal, so
-  live motion is visible instead of jumping whole degrees.
+  rest, light while the hinge moves. The readout shows one decimal, so live
+  motion is visible instead of jumping whole degrees.
+- The main screen also has the **Simulate hinge** switch and slider, so you can
+  play the effect and watch it in real time without folding (handy when the
+  Accessibility service isn't enabled yet).
 
 ## License
 

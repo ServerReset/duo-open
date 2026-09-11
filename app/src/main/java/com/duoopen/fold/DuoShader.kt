@@ -21,7 +21,7 @@ data class FoldLine(
 /** Shared glue for res/raw/duo_unfold.agsl — used by the app, wallpaper and overlay. */
 object DuoShader {
     /** Pane tilt cap; beyond this the kernel is mostly black anyway. */
-    const val MAX_TILT = 55f
+    const val MAX_TILT = 75f
 
     /** Pane tilts below this draw the plain image (effect visually off). */
     const val FLAT_EPSILON = 0.05f

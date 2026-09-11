@@ -17,6 +17,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableIntStateOf
@@ -65,6 +66,17 @@ fun DuoApp(foldLineFlow: StateFlow<FoldLine?>) {
         onPauseOrDispose { hinge.stop() }
     }
     val batterySaver by PowerState.batterySaver.collectAsStateWithLifecycle()
+
+    // Ticks the sensor diagnostic even when no events are arriving, so "no
+    // events yet" is visible instead of a frozen reading.
+    var diagTick by remember { mutableIntStateOf(0) }
+    LaunchedEffect(Unit) {
+        while (true) {
+            kotlinx.coroutines.delay(500)
+            diagTick++
+        }
+    }
+    val sensorStatus = remember(diagTick, hingeAngle) { hinge.statusText() }
 
     // Without a hinge sensor (emulator, non-foldable) the slider is the only input.
     var simulate by rememberSaveable { mutableStateOf(hinge.sensor == null) }
@@ -119,7 +131,12 @@ fun DuoApp(foldLineFlow: StateFlow<FoldLine?>) {
             image = image,
             hingeAngle = angle,
             paneTilt = paneTilt,
-            simulated = simulate,
+            simulate = simulate,
+            sensorPresent = hinge.sensor != null,
+            sensorStatus = sensorStatus,
+            simulatedAngle = simulatedAngle,
+            onSimulateChange = { simulate = it },
+            onSimulatedAngleChange = { simulatedAngle = it },
             batterySaverReduced = effectReduced,
             overlayEnabled = overlayEnabled,
             wallpaperActive = wallpaperActive,
@@ -144,10 +161,6 @@ fun DuoApp(foldLineFlow: StateFlow<FoldLine?>) {
                 },
                 hingeAngle = angle,
                 paneTilt = paneTilt,
-                simulate = simulate,
-                onSimulateChange = { simulate = it },
-                simulatedAngle = simulatedAngle,
-                onSimulatedAngleChange = { simulatedAngle = it },
                 onPickImage = {
                     pickImage.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly))
                 },

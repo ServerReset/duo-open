@@ -41,10 +41,6 @@ fun ControlSheet(
     sensorName: String?,
     hingeAngle: Float,
     paneTilt: Float,
-    simulate: Boolean,
-    onSimulateChange: (Boolean) -> Unit,
-    simulatedAngle: Float,
-    onSimulatedAngleChange: (Float) -> Unit,
     onPickImage: () -> Unit,
     onDefaultImage: () -> Unit,
     onSetWallpaper: () -> Unit,
@@ -106,25 +102,6 @@ fun ControlSheet(
             )
 
             Spacer(Modifier.height(12.dp))
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Text("Simulate hinge", Modifier.weight(1f), style = MaterialTheme.typography.titleSmall)
-                Switch(
-                    checked = simulate,
-                    onCheckedChange = onSimulateChange,
-                    enabled = sensorName != null,
-                )
-            }
-            if (simulate) {
-                LabeledSlider(
-                    label = "Hinge angle",
-                    valueText = "${simulatedAngle.roundToInt()}°",
-                    value = simulatedAngle,
-                    onValueChange = onSimulatedAngleChange,
-                    range = 60f..180f,
-                )
-            }
-
-            HorizontalDivider(Modifier.padding(vertical = 12.dp))
 
             Text("Moving half", style = MaterialTheme.typography.titleSmall)
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -187,7 +164,7 @@ fun ControlSheet(
                 valueText = "${config.eyeDistanceMm.roundToInt()} mm",
                 value = config.eyeDistanceMm,
                 onValueChange = { v -> DuoSettings.update { it.copy(eyeDistanceMm = v) } },
-                range = 200f..800f,
+                range = 100f..800f,
             )
             Row(
                 Modifier.fillMaxWidth(),

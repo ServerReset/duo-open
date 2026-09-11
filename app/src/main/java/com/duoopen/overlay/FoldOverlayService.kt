@@ -484,7 +484,7 @@ class FoldOverlayService : AccessibilityService() {
         /** Ease time constant for the timed resolve (≈ 250 ms to settle). */
         private const val TIMED_RESOLVE_TAU_S = 0.07f
         /** Tilt hysteresis for leaving a rest pose, so hinge jitter doesn't fire. */
-        private const val REST_LEAVE_TILT = 3f
+        private const val REST_LEAVE_TILT = 1f
         /** After a swap, don't bother if the fold is nearly finished by capture time. */
         private const val SKIP_INNER_ABOVE_HINGE = 135f
         private const val SKIP_COVER_BELOW_HINGE = 10f

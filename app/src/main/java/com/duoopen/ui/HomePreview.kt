@@ -20,6 +20,8 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.FilledTonalButton
+import androidx.compose.material3.Slider
+import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -56,7 +58,12 @@ fun HomePreview(
     image: ImageBitmap?,
     hingeAngle: Float,
     paneTilt: Float,
-    simulated: Boolean,
+    simulate: Boolean,
+    sensorPresent: Boolean,
+    sensorStatus: String,
+    simulatedAngle: Float,
+    onSimulateChange: (Boolean) -> Unit,
+    onSimulatedAngleChange: (Float) -> Unit,
     batterySaverReduced: Boolean,
     overlayEnabled: Boolean,
     wallpaperActive: Boolean,
@@ -104,7 +111,7 @@ fun HomePreview(
 
             Spacer(Modifier.weight(1f))
 
-            HingeReadout(hingeAngle, paneTilt, simulated, batterySaverReduced)
+            HingeReadout(hingeAngle, paneTilt, simulate, batterySaverReduced)
 
             Spacer(Modifier.height(28.dp))
 
@@ -113,6 +120,17 @@ fun HomePreview(
                 StatTile("Pane tilt", "%.1f°".format(paneTilt))
                 StatTile("State", if (paneTilt < 0.05f) "Flat" else "Folding")
             }
+
+            Spacer(Modifier.height(14.dp))
+
+            SimulatorCard(
+                simulate = simulate,
+                sensorPresent = sensorPresent,
+                sensorStatus = sensorStatus,
+                angle = simulatedAngle,
+                onSimulateChange = onSimulateChange,
+                onAngleChange = onSimulatedAngleChange,
+            )
 
             Spacer(Modifier.weight(1f))
 
@@ -203,6 +221,55 @@ private fun SetupBanner(onSetup: () -> Unit) {
 }
 
 @Composable
+private fun SimulatorCard(
+    simulate: Boolean,
+    sensorPresent: Boolean,
+    sensorStatus: String,
+    angle: Float,
+    onSimulateChange: (Boolean) -> Unit,
+    onAngleChange: (Float) -> Unit,
+) {
+    Column(
+        Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(20.dp))
+            .background(Glass)
+            .border(1.dp, GlassEdge, RoundedCornerShape(20.dp))
+            .padding(16.dp),
+    ) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Column(Modifier.weight(1f)) {
+                Text(
+                    "Simulate hinge",
+                    color = Color.White,
+                    fontWeight = FontWeight.SemiBold,
+                    fontSize = 14.sp,
+                )
+                Text(
+                    if (sensorPresent) sensorStatus else "No hinge sensor — slider only",
+                    color = Dim,
+                    fontSize = 11.sp,
+                )
+            }
+            Switch(
+                checked = simulate,
+                onCheckedChange = onSimulateChange,
+                enabled = sensorPresent,
+            )
+        }
+        if (simulate || !sensorPresent) {
+            Spacer(Modifier.height(6.dp))
+            Slider(
+                value = angle,
+                onValueChange = onAngleChange,
+                valueRange = 0f..180f,
+            )
+            Text("Hinge %.0f°".format(angle), color = Dim, fontSize = 11.sp)
+        }
+    }
+}
+
+@Composable
 private fun HingeReadout(
     hingeAngle: Float,
     paneTilt: Float,
@@ -211,8 +278,8 @@ private fun HingeReadout(
 ) {
     val hint = when {
         batterySaverReduced -> "Battery Saver on — effect reduced"
-        simulated -> "Simulated hinge — tune ▸ drag the slider"
-        hingeAngle.isNaN() -> "Waiting for hinge sensor…"
+        simulated -> "Simulated hinge — drag the slider on the main screen"
+        hingeAngle.isNaN() -> "Waiting for hinge sensor — check the sensor status below"
         paneTilt < 0.05f -> "Fold the phone partway, then open it"
         else -> "Keep opening"
     }
