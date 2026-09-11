@@ -113,6 +113,8 @@ class HingeAngleSource(
     fun sensorReport(): String {
         val sb = StringBuilder("Duo Open hinge sensor report\n")
         sb.append("active=${activeSensor?.name ?: sensor?.name ?: "none"}\n")
+        sb.append("gyro=${gyro?.name ?: "none"}\n")
+        sb.append("estimate=${"%.1f".format(lastAngle)} gyroActive=${estimator.motionActive}\n")
         sb.append("rate=${"%.1f".format(rateHz)}Hz gap=${"%.0f".format(eventGapMs)}ms\n")
         sb.append("sensors:\n")
         val related = allSensors.filter(::isFoldRelated)
@@ -190,7 +192,7 @@ class HingeAngleSource(
 
     override fun onSensorChanged(event: SensorEvent) {
         val now = SystemClock.uptimeMillis()
-        if (event.sensor == gyro) {
+        if (event.sensor.type == Sensor.TYPE_GYROSCOPE) {
             estimator.onGyro(event.values.getOrNull(1) ?: 0f, event.timestamp, now)
             return
         }

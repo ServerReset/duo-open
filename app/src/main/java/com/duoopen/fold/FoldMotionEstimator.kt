@@ -43,10 +43,13 @@ class FoldMotionEstimator(private val onAngle: (Float) -> Unit) {
                 onsetSince = 0L
             }
             else -> {
-                // Mid stop (typically 90°): pull the estimate halfway toward it
-                // and infer the direction from where we came from.
-                if (previous.isFinite() && previous != angle && !active) {
+                // Mid stop (typically 90°): infer the direction from where we
+                // came, go active so the gyro keeps interpolating to the
+                // endpoint, and pull the estimate toward the stop.
+                if (previous.isFinite() && previous != angle) {
                     direction = if (angle > previous) 1 else -1
+                    active = true
+                    lastMotionMs = now
                 }
                 estimated = (estimated + (angle - estimated) * 0.5f).coerceIn(0f, 180f)
             }
@@ -102,6 +105,9 @@ class FoldMotionEstimator(private val onAngle: (Float) -> Unit) {
         lastMotionMs = 0L
     }
 
+    /** True while the gyro is actively driving the estimate. */
+    val motionActive: Boolean get() = active
+
     private fun emit(angle: Float) {
         if (angle.isFinite()) onAngle(angle)
     }
@@ -110,10 +116,10 @@ class FoldMotionEstimator(private val onAngle: (Float) -> Unit) {
         const val END_LO = 1f
         const val END_HI = 179f
         /** Sustained angular speed (rad/s) that starts a fold from rest. */
-        const val ONSET_RATE = 0.6f
-        const val ONSET_HOLD_MS = 150L
-        const val STILL_RATE = 0.1f
-        const val SETTLE_MS = 500L
+        const val ONSET_RATE = 0.15f
+        const val ONSET_HOLD_MS = 200L
+        const val STILL_RATE = 0.05f
+        const val SETTLE_MS = 700L
         const val RESPONSE = 1.0f
     }
 }
